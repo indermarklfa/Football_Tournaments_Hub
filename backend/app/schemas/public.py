@@ -59,3 +59,34 @@ class PublicFixtureResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PublicMatchEventResponse(BaseModel):
+    id: UUID
+    team_id: UUID
+    team_name: Optional[str] = None
+    player_id: Optional[UUID]
+    player_name: Optional[str] = None
+    event_type: str
+    minute: int
+
+    class Config:
+        from_attributes = True
+
+
+class TopScorerResponse(BaseModel):
+    player_id: UUID
+    player_name: str
+    team_id: UUID
+    team_name: str
+    goals: int
+
+
+class DisciplineResponse(BaseModel):
+    player_id: UUID
+    player_name: str
+    team_id: UUID
+    team_name: str
+    yellow_cards: int
+    red_cards: int
+    total: int
