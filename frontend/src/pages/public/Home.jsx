@@ -8,18 +8,28 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    searchTournaments().then((res) => {
-      setTournaments(res.data);
-      setLoading(false);
-    });
+    searchTournaments()
+      .then((res) => {
+        setTournaments(res.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setTournaments([]);
+        setLoading(false);
+      });
   }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const res = await searchTournaments(query);
-    setTournaments(res.data);
-    setLoading(false);
+    try {
+      const res = await searchTournaments(query);
+      setTournaments(res.data);
+    } catch {
+      setTournaments([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
