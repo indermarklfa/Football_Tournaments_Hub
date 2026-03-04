@@ -71,3 +71,35 @@ async def update_edition(id: UUID, req: EditionUpdate, db: AsyncSession = Depend
     await db.commit()
     await db.refresh(e)
     return e
+
+
+@router.get("/{id}/alive-teams")
+async def get_alive_teams(id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    from app.models import Team, Match, MatchStatus
+    result = await db.execute(
+        select(Edition).join(Tournament).join(Organiser).where(Edition.id == id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Edition not found")
+    
+    teams_result = await db.execute(select(Team).where(Team.edition_id == id, Team.deleted_at.is_(None)))
+    all_teams = {t.id: t for t in teams_result.scalars().all()}
+    
+    matches_result = await db.execute(
+        select(Match).where(Match.edition_id == id, Match.status == MatchStatus.COMPLETED, Match.deleted_at.is_(None))
+    )
+    completed_matches = matches_result.scalars().all()
+    
+    if not completed_matches:
+        return [{"id": str(t.id), "name": t.name, "logo_url": t.logo_url} for t in all_teams.values()]
+    
+    losers = set()
+    for m in completed_matches:
+        if m.home_score is not None and m.away_score is not None:
+            if m.home_score < m.away_score:
+                losers.add(m.home_team_id)
+            elif m.away_score < m.home_score:
+                losers.add(m.away_team_id)
+    
+    alive = [t for tid, t in all_teams.items() if tid not in losers]
+    return [{"id": str(t.id), "name": t.name, "logo_url": t.logo_url} for t in alive]

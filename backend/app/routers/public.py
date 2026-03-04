@@ -207,3 +207,75 @@ async def get_discipline(edition_id: UUID, limit: int = 50, db: AsyncSession = D
     ]
     data.sort(key=lambda x: (-x.total, -x.red_cards))
     return data[:limit]
+
+
+@router.get("/teams/{team_id}/players")
+async def get_public_players(team_id: UUID, db: AsyncSession = Depends(get_db)):
+    team_result = await db.execute(select(Team).where(Team.id == team_id, Team.deleted_at.is_(None)))
+    if not team_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Team not found")
+    result = await db.execute(select(Player).where(Player.team_id == team_id, Player.deleted_at.is_(None)))
+    players = result.scalars().all()
+    return [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "jersey_number": p.jersey_number,
+            "position": p.position.value if p.position else None,
+        }
+        for p in players
+    ]
+
+
+@router.get("/tournaments/{tournament_id}")
+async def get_public_tournament(tournament_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Tournament, Organiser.name.label("org_name"), Organiser.location.label("org_loc"))
+        .join(Organiser)
+        .where(Tournament.id == tournament_id, Tournament.deleted_at.is_(None))
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    t = row.Tournament
+    editions_result = await db.execute(
+        select(Edition).where(Edition.tournament_id == tournament_id, Edition.deleted_at.is_(None)).order_by(Edition.year.desc())
+    )
+    editions = editions_result.scalars().all()
+    return {
+        "id": str(t.id),
+        "name": t.name,
+        "description": t.description,
+        "logo_url": t.logo_url,
+        "organiser_name": row.org_name,
+        "organiser_location": row.org_loc,
+        "editions": [
+            {"id": str(e.id), "name": e.name, "year": e.year, "status": e.status.value}
+            for e in editions
+        ],
+    }
+
+
+@router.get("/matches/{match_id}")
+async def get_public_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Match).where(Match.id == match_id, Match.deleted_at.is_(None)))
+    m = result.scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Match not found")
+    teams_result = await db.execute(select(Team).where(Team.id.in_([m.home_team_id, m.away_team_id])))
+    teams = {t.id: t for t in teams_result.scalars().all()}
+    return {
+        "id": str(m.id),
+        "edition_id": str(m.edition_id),
+        "stage": m.stage.value,
+        "matchday": m.matchday,
+        "kickoff_datetime": m.kickoff_datetime.isoformat() if m.kickoff_datetime else None,
+        "venue": m.venue,
+        "home_team_id": str(m.home_team_id),
+        "home_team_name": teams.get(m.home_team_id).name if teams.get(m.home_team_id) else None,
+        "away_team_id": str(m.away_team_id),
+        "away_team_name": teams.get(m.away_team_id).name if teams.get(m.away_team_id) else None,
+        "home_score": m.home_score,
+        "away_score": m.away_score,
+        "status": m.status.value,
+    }

@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.settings import get_settings
-from app.routers import auth, organisers, tournaments, editions, teams, matches, match_events, public
+from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public
 
 settings = get_settings()
 
@@ -16,16 +16,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(organisers.router)
-app.include_router(tournaments.router)
-app.include_router(editions.router)
-app.include_router(teams.router)
-app.include_router(matches.router)
-app.include_router(match_events.router)
-app.include_router(public.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(organisers.router, prefix="/api")
+app.include_router(tournaments.router, prefix="/api")
+app.include_router(editions.router, prefix="/api")
+app.include_router(teams.router, prefix="/api")
+app.include_router(players.router, prefix="/api")
+app.include_router(matches.router, prefix="/api")
+app.include_router(match_events.router, prefix="/api")
+app.include_router(public.router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "ok"}
