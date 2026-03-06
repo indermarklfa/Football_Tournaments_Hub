@@ -47,7 +47,7 @@ export default function Home() {
             data-testid="search-btn">Search</button>
         </form>
       </div>
-      <div className="flex flex-wrap gap-2 justify-center mt-4">
+      <div className="flex flex-wrap gap-2 justify-center mt-4 mb-6">
         {['', 'U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'U21', 'Senior', 'Veterans'].map(ag => (
           <button key={ag} onClick={async () => {
             setAgeGroupFilter(ag);

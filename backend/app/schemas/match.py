@@ -22,8 +22,12 @@ class MatchUpdate(BaseModel):
     matchday: Optional[int] = None
     kickoff_datetime: Optional[datetime] = None
     venue: Optional[str] = None
+    home_team_id: Optional[UUID] = None
+    away_team_id: Optional[UUID] = None
     home_score: Optional[int] = None
     away_score: Optional[int] = None
+    home_penalties: Optional[int] = None
+    away_penalties: Optional[int] = None
     status: Optional[str] = None
     deleted: Optional[bool] = None
 
@@ -40,6 +44,8 @@ class MatchResponse(BaseModel):
     away_team_id: UUID
     home_score: Optional[int]
     away_score: Optional[int]
+    home_penalties: Optional[int]
+    away_penalties: Optional[int]
     status: str
     created_at: datetime
 

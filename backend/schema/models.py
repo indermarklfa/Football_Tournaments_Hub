@@ -64,6 +64,7 @@ class MatchStage(str, PyEnum):
 class MatchStatus(str, PyEnum):
     SCHEDULED = "scheduled"
     LIVE = "live"
+    PENALTIES = "penalties"
     COMPLETED = "completed"
     POSTPONED = "postponed"
     CANCELLED = "cancelled"
@@ -77,6 +78,8 @@ class EventType(str, PyEnum):
     SUBSTITUTION = "substitution"
     PENALTY_SCORED = "penalty_scored"
     PENALTY_MISSED = "penalty_missed"
+    SHOOTOUT_SCORED = "shootout_scored"
+    SHOOTOUT_MISSED = "shootout_missed"
 
 
 class PlayerPosition(str, PyEnum):
@@ -501,6 +504,8 @@ class Match(Base):
     )
     home_score = Column(Integer, default=0)
     away_score = Column(Integer, default=0)
+    home_penalties = Column(Integer, nullable=True)
+    away_penalties = Column(Integer, nullable=True)
     status = Column(
         Enum(MatchStatus, name="match_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,

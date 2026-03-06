@@ -98,6 +98,8 @@ async def get_public_fixtures(edition_id: UUID, db: AsyncSession = Depends(get_d
             away_team_name=teams.get(m.away_team_id),
             home_score=m.home_score,
             away_score=m.away_score,
+            home_penalties=m.home_penalties,
+            away_penalties=m.away_penalties,
             status=m.status.value,
         )
         for m in matches
@@ -284,6 +286,8 @@ async def get_public_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
         "away_team_name": teams.get(m.away_team_id).name if teams.get(m.away_team_id) else None,
         "home_score": m.home_score,
         "away_score": m.away_score,
+        "home_penalties": m.home_penalties,
+        "away_penalties": m.away_penalties,
         "status": m.status.value,
     }
 @router.get("/editions/{edition_id}/standings")

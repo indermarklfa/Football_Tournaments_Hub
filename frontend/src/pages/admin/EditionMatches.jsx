@@ -69,6 +69,8 @@ export default function EditionMatches() {
       kickoff: m.kickoff_datetime ? m.kickoff_datetime.slice(0, 16) : '',
       venue: m.venue || '',
       status: m.status,
+      homePenalties: m.home_penalties ?? '',
+      awayPenalties: m.away_penalties ?? '',
     });
   };
 
@@ -81,6 +83,8 @@ export default function EditionMatches() {
       kickoff_datetime: editForm.kickoff || null,
       venue: editForm.venue || null,
       status: editForm.status,
+      home_penalties: editForm.homePenalties !== '' ? parseInt(editForm.homePenalties) : null,
+      away_penalties: editForm.awayPenalties !== '' ? parseInt(editForm.awayPenalties) : null,
     });
     setEditingMatch(null);
     loadData();
@@ -284,6 +288,31 @@ export default function EditionMatches() {
                       {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
+                  {editForm.status === 'completed' && (
+                    <>
+                      <div>
+                        <label className="block text-slate-400 text-xs mb-1">
+                          Penalties — {teams.find(t => t.id === editForm.homeTeamId)?.name || 'Home'}
+                        </label>
+                        <input type="number" min="0"
+                          value={editForm.homePenalties ?? ''}
+                          onChange={(e) => setEditForm({ ...editForm, homePenalties: e.target.value })}
+                          placeholder="e.g. 4"
+                          className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-xs mb-1">
+                          Penalties — {teams.find(t => t.id === editForm.awayTeamId)?.name || 'Away'}
+                        </label>
+                        <input type="number" min="0"
+                          value={editForm.awayPenalties ?? ''}
+                          onChange={(e) => setEditForm({ ...editForm, awayPenalties: e.target.value })}
+                          placeholder="e.g. 3"
+                          className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                      </div>
+                    <p className="col-span-2 text-slate-500 text-xs">Only fill penalties if the match was decided by a shootout</p>
+                    </>
+                  )}
                   <div>
                     <label className="block text-slate-400 text-xs mb-1">Kickoff</label>
                     <input type="datetime-local" value={editForm.kickoff}
@@ -324,7 +353,25 @@ export default function EditionMatches() {
                     m.status === 'completed' ? 'bg-green-600' : m.status === 'live' ? 'bg-red-600' : 'bg-slate-600'
                   } text-white`}>{m.status}</span>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
+                  {m.status === 'scheduled' && (
+                    <button onClick={async () => { await updateMatch(m.id, { status: 'live' }); loadData(); }}
+                      className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">
+                      Mark Live
+                    </button>
+                  )}
+                  {m.status === 'live' && m.home_score === m.away_score && (
+                    <button onClick={async () => { await updateMatch(m.id, { status: 'penalties' }); loadData(); }}
+                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded">
+                      Penalties
+                    </button>
+                  )}
+                  {(m.status === 'live' || m.status === 'penalties') && (
+                    <button onClick={async () => { await updateMatch(m.id, { status: 'completed' }); loadData(); }}
+                      className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded">
+                      Mark Completed
+                    </button>
+                  )}
                   <button onClick={() => openEdit(m)} className="text-emerald-400 hover:text-emerald-300 text-sm"
                     data-testid={`edit-match-${m.id}`}>Edit</button>
                   <Link to={`/admin/matches/${m.id}/events`} className="text-emerald-400 hover:underline text-sm">Events</Link>

@@ -56,6 +56,8 @@ class PublicFixtureResponse(BaseModel):
     away_team_name: Optional[str] = None
     home_score: Optional[int]
     away_score: Optional[int]
+    home_penalties: Optional[int] = None
+    away_penalties: Optional[int] = None
     status: str
 
     class Config:
