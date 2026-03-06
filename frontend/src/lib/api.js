@@ -64,6 +64,14 @@ export const getPlayers = (teamId) => api.get(`/api/players?team_id=${teamId}`);
 export const updatePlayer = (id, data) => api.patch(`/api/players/${id}`, data);
 export const deletePlayer = (id) => api.post(`/api/players/${id}/delete`);
 
+// Groups
+export const createGroup = (editionId, name) => api.post(`/api/groups?edition_id=${editionId}&name=${encodeURIComponent(name)}`);
+export const getGroups = (editionId) => api.get(`/api/groups?edition_id=${editionId}`);
+export const deleteGroup = (groupId) => api.delete(`/api/groups/${groupId}`);
+export const addTeamToGroup = (groupId, teamId) => api.post(`/api/groups/${groupId}/teams/${teamId}`);
+export const removeTeamFromGroup = (groupId, teamId) => api.delete(`/api/groups/${groupId}/teams/${teamId}`);
+export const getPublicStandings = (editionId) => api.get(`/api/public/editions/${editionId}/standings`);
+
 // Matches
 export const createMatch = (data) => api.post('/api/matches', data);
 export const getMatches = (editionId) => api.get(`/api/matches?edition_id=${editionId}`);
@@ -77,7 +85,13 @@ export const updateMatchEvent = (id, data) => api.patch(`/api/match-events/${id}
 export const deleteMatchEvent = (id) => api.post(`/api/match-events/${id}/delete`);
 
 // Public
-export const searchTournaments = (q) => api.get(`/api/public/tournaments/search${q ? `?q=${q}` : ''}`);
+export const searchTournaments = (q, age_group) => {
+  const params = new URLSearchParams();
+  if (q) params.append('q', q);
+  if (age_group) params.append('age_group', age_group);
+  const qs = params.toString();
+  return api.get(`/api/public/tournaments/search${qs ? `?${qs}` : ''}`);
+};
 export const getPublicTournament = (id) => api.get(`/api/public/tournaments/${id}`);
 export const getPublicEdition = (id) => api.get(`/api/public/editions/${id}`);
 export const getPublicFixtures = (editionId) => api.get(`/api/public/editions/${editionId}/fixtures`);

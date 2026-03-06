@@ -70,7 +70,7 @@ export default function NewEdition() {
           </div>
         </div>
         <div>
-          <label className="block text-slate-300 mb-1">Venue</label>
+          <label className="block text-slate-300 mb-1">Venue(s) <span className="text-slate-500 text-xs">— separate multiple with a comma</span></label>
           <input value={venue} onChange={(e) => setVenue(e.target.value)}
             className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500" />
         </div>

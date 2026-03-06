@@ -11,6 +11,32 @@ from app.schemas.match_event import MatchEventCreate, MatchEventUpdate, MatchEve
 
 router = APIRouter(prefix="/match-events", tags=["match-events"])
 
+async def recalculate_score(db: AsyncSession, match: Match):
+    """Recount goals from non-deleted events and update match score."""
+    result = await db.execute(
+        select(MatchEvent).where(
+            MatchEvent.match_id == match.id,
+            MatchEvent.deleted_at.is_(None),
+            MatchEvent.event_type.in_([EventType.GOAL, EventType.PENALTY_SCORED, EventType.OWN_GOAL])
+        )
+    )
+    events = result.scalars().all()
+    home_score = 0
+    away_score = 0
+    for e in events:
+        if e.event_type == EventType.OWN_GOAL:
+            # Own goal counts for the opposing team
+            if e.team_id == match.home_team_id:
+                away_score += 1
+            else:
+                home_score += 1
+        else:
+            if e.team_id == match.home_team_id:
+                home_score += 1
+            else:
+                away_score += 1
+    match.home_score = home_score
+    match.away_score = away_score
 
 async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User) -> Match:
     result = await db.execute(
@@ -54,6 +80,8 @@ async def create_match_event(req: MatchEventCreate, db: AsyncSession = Depends(g
         additional_info=req.additional_info,
     )
     db.add(event)
+    await db.flush()
+    await recalculate_score(db, match)
     await db.commit()
     await db.refresh(event)
     return event
@@ -116,6 +144,10 @@ async def delete_match_event(event_id: UUID, db: AsyncSession = Depends(get_db),
     if not event:
         raise HTTPException(status_code=404, detail="Match event not found")
     event.deleted_at = datetime.now(timezone.utc)
+    await db.flush()
+    match_result = await db.execute(select(Match).where(Match.id == event.match_id))
+    match = match_result.scalar_one()
+    await recalculate_score(db, match)
     await db.commit()
     await db.refresh(event)
     return event

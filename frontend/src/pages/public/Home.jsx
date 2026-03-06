@@ -4,11 +4,12 @@ import { searchTournaments } from '../../lib/api';
 
 export default function Home() {
   const [query, setQuery] = useState('');
+  const [ageGroupFilter, setAgeGroupFilter] = useState('');
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    searchTournaments()
+    searchTournaments('', '')
       .then((res) => {
         setTournaments(res.data);
         setLoading(false);
@@ -23,7 +24,7 @@ export default function Home() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await searchTournaments(query);
+      const res = await searchTournaments(query, ageGroupFilter);
       setTournaments(res.data);
     } catch {
       setTournaments([]);
@@ -46,7 +47,27 @@ export default function Home() {
             data-testid="search-btn">Search</button>
         </form>
       </div>
-
+      <div className="flex flex-wrap gap-2 justify-center mt-4">
+        {['', 'U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'U21', 'Senior', 'Veterans'].map(ag => (
+          <button key={ag} onClick={async () => {
+            setAgeGroupFilter(ag);
+            setLoading(true);
+            try {
+              const res = await searchTournaments(query, ag);
+              setTournaments(res.data);
+            } finally {
+              setLoading(false);
+            }
+          }}
+            className={`px-3 py-1 rounded-full text-sm ${
+              ageGroupFilter === ag
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-700 text-slate-400 hover:text-white'
+            }`}>
+            {ag || 'All'}
+          </button>
+        ))}
+      </div>
       {loading ? (
         <div className="text-center text-slate-400">Loading...</div>
       ) : tournaments.length === 0 ? (
@@ -59,9 +80,12 @@ export default function Home() {
               data-testid={`tournament-card-${t.id}`}>
               <h2 className="text-xl font-semibold text-white mb-2">{t.name}</h2>
               <p className="text-slate-400 text-sm line-clamp-2 mb-3">{t.description || 'No description'}</p>
-              <div className="flex items-center text-sm text-slate-500">
+              <div className="flex items-center gap-2 text-sm text-slate-500 flex-wrap">
+                {t.age_group && (
+                  <span className="bg-emerald-700/50 text-emerald-300 text-xs px-2 py-0.5 rounded">{t.age_group}</span>
+                )}
                 <span>{t.organiser_name}</span>
-                {t.organiser_location && <span className="ml-2">• {t.organiser_location}</span>}
+                {t.organiser_location && <span>• {t.organiser_location}</span>}
               </div>
             </Link>
           ))}

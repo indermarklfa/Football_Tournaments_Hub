@@ -98,7 +98,7 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(
-        Enum(UserRole, name="user_role", create_type=False),
+        Enum(UserRole, name="user_role", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=UserRole.ORGANISER
     )
@@ -181,6 +181,7 @@ class Tournament(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     logo_url = Column(String(500), nullable=True)
+    age_group = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -224,12 +225,12 @@ class Edition(Base):
     end_date = Column(Date, nullable=True)
     venue = Column(String(255), nullable=True)
     format = Column(
-        Enum(EditionFormat, name="edition_format", create_type=False),
+        Enum(EditionFormat, name="edition_format", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=EditionFormat.GROUPS_KNOCKOUT
     )
     status = Column(
-        Enum(EditionStatus, name="edition_status", create_type=False),
+        Enum(EditionStatus, name="edition_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=EditionStatus.UPCOMING
     )
@@ -356,7 +357,7 @@ class Player(Base):
     name = Column(String(255), nullable=False)
     jersey_number = Column(Integer, nullable=True)
     position = Column(
-        Enum(PlayerPosition, name="player_position", create_type=False),
+        Enum(PlayerPosition, name="player_position", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=True
     )
     date_of_birth = Column(Date, nullable=True)
@@ -481,7 +482,7 @@ class Match(Base):
         nullable=True
     )
     stage = Column(
-        Enum(MatchStage, name="match_stage", create_type=False),
+        Enum(MatchStage, name="match_stage", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=MatchStage.GROUP
     )
@@ -501,7 +502,7 @@ class Match(Base):
     home_score = Column(Integer, default=0)
     away_score = Column(Integer, default=0)
     status = Column(
-        Enum(MatchStatus, name="match_status", create_type=False),
+        Enum(MatchStatus, name="match_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=MatchStatus.SCHEDULED
     )
@@ -569,7 +570,7 @@ class MatchEvent(Base):
         nullable=True
     )
     event_type = Column(
-        Enum(EventType, name="event_type", create_type=False),
+        Enum(EventType, name="event_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False
     )
     minute = Column(Integer, nullable=False)

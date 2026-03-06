@@ -64,3 +64,11 @@ async def update_match(id: UUID, req: MatchUpdate, db: AsyncSession = Depends(ge
     await db.commit()
     await db.refresh(m)
     return m
+
+@router.post("/{id}/delete", response_model=MatchResponse)
+async def delete_match(id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    m = await get_match_with_ownership(db, id, user)
+    m.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(m)
+    return m

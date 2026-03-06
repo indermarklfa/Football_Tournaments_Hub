@@ -10,12 +10,14 @@ class TournamentCreate(BaseModel):
     name: str
     description: Optional[str] = None
     logo_url: Optional[str] = None
+    age_group: Optional[str] = None
 
 
 class TournamentUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     logo_url: Optional[str] = None
+    age_group: Optional[str] = None
     deleted: Optional[bool] = None
 
 
@@ -25,6 +27,7 @@ class TournamentResponse(BaseModel):
     name: str
     description: Optional[str]
     logo_url: Optional[str]
+    age_group: Optional[str]
     created_at: datetime
 
     class Config:

@@ -18,6 +18,7 @@ import NewTournament from './pages/admin/NewTournament';
 import TournamentDetail from './pages/admin/TournamentDetail';
 import NewEdition from './pages/admin/NewEdition';
 import EditionTeams from './pages/admin/EditionTeams';
+import EditionGroups from './pages/admin/EditionGroups';
 import EditionMatches from './pages/admin/EditionMatches';
 import MatchEvents from './pages/admin/MatchEvents';
 
@@ -47,6 +48,7 @@ function App() {
               <Route path="/admin/editions/new" element={<ProtectedRoute><NewEdition /></ProtectedRoute>} />
               <Route path="/admin/editions/:id/teams" element={<ProtectedRoute><EditionTeams /></ProtectedRoute>} />
               <Route path="/admin/editions/:id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
+              <Route path="/admin/editions/:id/groups" element={<ProtectedRoute><EditionGroups /></ProtectedRoute>} />
               <Route path="/admin/matches/:id/events" element={<ProtectedRoute><MatchEvents /></ProtectedRoute>} />
             </Routes>
           </main>

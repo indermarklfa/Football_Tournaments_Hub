@@ -8,6 +8,7 @@ export default function NewTournament() {
   const [organisers, setOrganisers] = useState([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [ageGroup, setAgeGroup] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function NewTournament() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await createTournament({ organiser_id: organiserId, name, description: description || null });
+      const res = await createTournament({ organiser_id: organiserId, name, description: description || null, age_group: ageGroup || null });
       navigate(`/admin/tournaments/${res.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tournament');
@@ -48,6 +49,22 @@ export default function NewTournament() {
           <input value={name} onChange={(e) => setName(e.target.value)} required
             className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
             data-testid="name-input" />
+        </div>
+        <div>
+          <label className="block text-slate-300 mb-1">Age Group</label>
+          <select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)}
+            className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">None / Open</option>
+            <option value="U9">U9</option>
+            <option value="U11">U11</option>
+            <option value="U13">U13</option>
+            <option value="U15">U15</option>
+            <option value="U17">U17</option>
+            <option value="U19">U19</option>
+            <option value="U21">U21</option>
+            <option value="Senior">Senior</option>
+            <option value="Veterans">Veterans</option>
+          </select>
         </div>
         <div>
           <label className="block text-slate-300 mb-1">Description</label>

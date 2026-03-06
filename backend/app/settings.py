@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_MINUTES: int = 10080
-    CORS_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

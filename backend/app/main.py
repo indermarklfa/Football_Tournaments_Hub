@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.settings import get_settings
-from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public
+from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public, groups
 
 settings = get_settings()
 
@@ -24,6 +24,7 @@ app.include_router(teams.router, prefix="/api")
 app.include_router(players.router, prefix="/api")
 app.include_router(matches.router, prefix="/api")
 app.include_router(match_events.router, prefix="/api")
+app.include_router(groups.router, prefix="/api")
 app.include_router(public.router, prefix="/api")
 
 

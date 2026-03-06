@@ -12,6 +12,7 @@ class PublicTournamentResponse(BaseModel):
     logo_url: Optional[str]
     organiser_name: Optional[str] = None
     organiser_location: Optional[str] = None
+    age_group: Optional[str] = None
 
     class Config:
         from_attributes = True
