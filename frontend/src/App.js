@@ -13,6 +13,8 @@ import MatchPage from './pages/public/MatchPage';
 import Login from './pages/admin/Login';
 import Register from './pages/admin/Register';
 import Dashboard from './pages/admin/Dashboard';
+import OrganiserDashboard from './pages/admin/OrganiserDashboard';
+import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
 import NewOrganiser from './pages/admin/NewOrganiser';
 import NewTournament from './pages/admin/NewTournament';
 import TournamentDetail from './pages/admin/TournamentDetail';
@@ -38,10 +40,16 @@ function App() {
 
               {/* Auth Routes */}
               <Route path="/admin/login" element={<Login />} />
-              <Route path="/admin/register" element={<Register />} />
+              <Route path="/admin/register" element={
+                <ProtectedRoute>
+                  <Register />
+                </ProtectedRoute>
+              } />
 
               {/* Protected Admin Routes */}
               <Route path="/admin/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/admin/organiser" element={<ProtectedRoute><OrganiserDashboard /></ProtectedRoute>} />
+              <Route path="/admin/super" element={<ProtectedRoute><SuperAdminDashboard /></ProtectedRoute>} />
               <Route path="/admin/organisers/new" element={<ProtectedRoute><NewOrganiser /></ProtectedRoute>} />
               <Route path="/admin/tournaments/new" element={<ProtectedRoute><NewTournament /></ProtectedRoute>} />
               <Route path="/admin/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />

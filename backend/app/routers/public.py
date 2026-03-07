@@ -47,7 +47,9 @@ async def search_tournaments(q: Optional[str] = None, location: Optional[str] = 
 @router.get("/editions/{edition_id}", response_model=PublicEditionResponse)
 async def get_public_edition(edition_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Edition, Tournament.name.label("t_name")).join(Tournament).where(Edition.id == edition_id, Edition.deleted_at.is_(None))
+        select(Edition, Tournament.name.label("t_name"), Tournament.logo_url.label("t_logo"))
+        .join(Tournament)
+        .where(Edition.id == edition_id, Edition.deleted_at.is_(None))
     )
     row = result.first()
     if not row:
@@ -57,6 +59,7 @@ async def get_public_edition(edition_id: UUID, db: AsyncSession = Depends(get_db
         id=e.id,
         tournament_id=e.tournament_id,
         tournament_name=row.t_name,
+        tournament_logo_url=row.t_logo,
         name=e.name,
         year=e.year,
         start_date=e.start_date,
@@ -82,7 +85,7 @@ async def get_public_fixtures(edition_id: UUID, db: AsyncSession = Depends(get_d
     team_ids = {m.home_team_id for m in matches} | {m.away_team_id for m in matches}
     if team_ids:
         teams_result = await db.execute(select(Team).where(Team.id.in_(team_ids)))
-        teams = {t.id: t.name for t in teams_result.scalars().all()}
+        teams = {t.id: t for t in teams_result.scalars().all()}
     else:
         teams = {}
     return [
@@ -93,9 +96,11 @@ async def get_public_fixtures(edition_id: UUID, db: AsyncSession = Depends(get_d
             kickoff_datetime=m.kickoff_datetime,
             venue=m.venue,
             home_team_id=m.home_team_id,
-            home_team_name=teams.get(m.home_team_id),
+            home_team_name=teams.get(m.home_team_id).name if teams.get(m.home_team_id) else None,
+            home_team_logo_url=teams.get(m.home_team_id).logo_url if teams.get(m.home_team_id) else None,
             away_team_id=m.away_team_id,
-            away_team_name=teams.get(m.away_team_id),
+            away_team_name=teams.get(m.away_team_id).name if teams.get(m.away_team_id) else None,
+            away_team_logo_url=teams.get(m.away_team_id).logo_url if teams.get(m.away_team_id) else None,
             home_score=m.home_score,
             away_score=m.away_score,
             home_penalties=m.home_penalties,
@@ -282,8 +287,10 @@ async def get_public_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
         "venue": m.venue,
         "home_team_id": str(m.home_team_id),
         "home_team_name": teams.get(m.home_team_id).name if teams.get(m.home_team_id) else None,
+        "home_team_logo_url": teams.get(m.home_team_id).logo_url if teams.get(m.home_team_id) else None,
         "away_team_id": str(m.away_team_id),
         "away_team_name": teams.get(m.away_team_id).name if teams.get(m.away_team_id) else None,
+        "away_team_logo_url": teams.get(m.away_team_id).logo_url if teams.get(m.away_team_id) else None,
         "home_score": m.home_score,
         "away_score": m.away_score,
         "home_penalties": m.home_penalties,

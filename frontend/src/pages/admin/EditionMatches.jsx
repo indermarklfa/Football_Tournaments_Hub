@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEdition, getTeams, getAliveTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch } from '../../lib/api';
+import { getEdition, getTeams, getAliveTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch, generateGroupFixtures, bulkUpdateMatches } from '../../lib/api';
 
 const STAGES = ['group', 'round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
 const STATUSES = ['scheduled', 'live', 'completed', 'postponed', 'cancelled'];
@@ -29,6 +29,11 @@ export default function EditionMatches() {
     groupId: '', kickoff: '', venue: ''
   });
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduleData, setScheduleData] = useState({});
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -41,6 +46,51 @@ export default function EditionMatches() {
     setMatches(matchesRes.data);
     setGroups(groupsRes.data);
     setLoading(false);
+  };
+
+  const handleGenerateFixtures = async () => {
+    if (!window.confirm(`Generate round-robin fixtures for all groups? This cannot be undone.`)) return;
+    setGenerating(true);
+    setGenerateError('');
+    try {
+      const res = await generateGroupFixtures({ edition_id: id, venue: edition?.venue || null });
+      await loadData();
+      alert(`✓ Created ${res.data.created} fixtures across ${res.data.groups} groups`);
+    } catch (err) {
+      setGenerateError(err.response?.data?.detail || 'Failed to generate fixtures');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const openScheduler = () => {
+    // Build initial schedule data from existing matches
+    const data = {};
+    matches.filter(m => m.stage === 'group').forEach(m => {
+      data[m.id] = {
+        kickoff: m.kickoff_datetime ? m.kickoff_datetime.slice(0, 16) : '',
+        venue: m.venue || '',
+      };
+    });
+    setScheduleData(data);
+    setShowScheduler(true);
+  };
+
+  const handleBulkSchedule = async () => {
+    setScheduleSaving(true);
+    try {
+      const payload = Object.entries(scheduleData).map(([id, vals]) => ({
+        id,
+        kickoff_datetime: vals.kickoff || null,
+        venue: vals.venue || null,
+      }));
+      const res = await bulkUpdateMatches({ matches: payload });
+      await loadData();
+      setShowScheduler(false);
+      alert(`✓ Updated ${res.data.updated} matches`);
+    } finally {
+      setScheduleSaving(false);
+    }
   };
 
   const handleCreate = async (e) => {
@@ -157,6 +207,168 @@ export default function EditionMatches() {
         </div>
       )}
 
+      
+      {/* Generate fixtures button — shown when groups exist and no group matches yet */}
+      {['groups_knockout', 'league'].includes(edition?.format) && groups.length > 0 && !matches.some(m => m.stage === 'group') && (
+        <div className="bg-slate-800 border border-slate-700 p-4 rounded-lg mb-6 flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm font-medium">Auto-generate group fixtures</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              Creates a full round-robin schedule for all {groups.length} group{groups.length !== 1 ? 's' : ''}
+            </p>
+            {generateError && <p className="text-red-400 text-xs mt-1">{generateError}</p>}
+          </div>
+          <button
+            onClick={handleGenerateFixtures}
+            disabled={generating}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm whitespace-nowrap ml-4">
+            {generating ? 'Generating...' : '⚡ Generate Fixtures'}
+          </button>
+        </div>
+      )}
+
+      {/* Schedule button — shown when group matches exist */}
+      {['groups_knockout', 'league'].includes(edition?.format) && matches.some(m => m.stage === 'group') && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openScheduler}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm">
+            📅 Schedule Matchdays
+          </button>
+        </div>
+      )}
+
+      {/* Scheduler modal */}
+      {showScheduler && (() => {
+        const groupMatches = matches.filter(m => m.stage === 'group');
+        const matchdays = [...new Set(groupMatches.map(m => m.matchday))].sort((a, b) => a - b);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8">
+            <div className="bg-slate-800 rounded-lg w-full max-w-4xl mx-4">
+              <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                <div>
+                  <h2 className="text-white font-semibold text-lg">Schedule Matchdays</h2>
+                  <p className="text-slate-400 text-sm mt-0.5">Set kickoff times and venues for group stage matches</p>
+                </div>
+                <button onClick={() => setShowScheduler(false)} className="text-slate-400 hover:text-white text-xl">✕</button>
+              </div>
+
+              <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+                {/* Apply to all */}
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <p className="text-slate-300 text-sm font-medium mb-3">Apply to all matches</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">Venue for all</label>
+                      <input
+                        placeholder="e.g. Main Stadium"
+                        className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm"
+                        onChange={(e) => {
+                          const venue = e.target.value;
+                          setScheduleData(prev => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach(id => { next[id] = { ...next[id], venue }; });
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1">Start time for all (time only)</label>
+                      <input type="time"
+                        className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm"
+                        onChange={(e) => {
+                          const time = e.target.value;
+                          setScheduleData(prev => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach(id => {
+                              const existing = next[id].kickoff || '';
+                              const datePart = existing.slice(0, 10) || '';
+                              if (datePart) next[id] = { ...next[id], kickoff: `${datePart}T${time}` };
+                            });
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per matchday */}
+                {matchdays.map(matchday => {
+                  const dayMatches = groupMatches.filter(m => m.matchday === matchday);
+                  return (
+                    <div key={matchday}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-white font-medium">Matchday {matchday}</h3>
+                        <div className="flex items-center gap-2">
+                          <input type="date"
+                            className="bg-slate-700 text-white px-2 py-1 rounded text-xs"
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              setScheduleData(prev => {
+                                const next = { ...prev };
+                                dayMatches.forEach(m => {
+                                  const timePart = next[m.id]?.kickoff?.slice(11, 16) || '12:00';
+                                  next[m.id] = { ...next[m.id], kickoff: `${date}T${timePart}` };
+                                });
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="text-slate-500 text-xs">Set date for all in matchday</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {dayMatches.map(m => (
+                          <div key={m.id} className="bg-slate-700/50 rounded p-3 grid grid-cols-3 gap-3 items-center">
+                            <div className="text-sm text-white">
+                              <span>{teamMap[m.home_team_id]}</span>
+                              <span className="text-slate-400 mx-2">vs</span>
+                              <span>{teamMap[m.away_team_id]}</span>
+                              {m.group_id && <span className="ml-2 text-xs text-slate-500">{groupMap[m.group_id]}</span>}
+                            </div>
+                            <div>
+                              <input type="datetime-local"
+                                value={scheduleData[m.id]?.kickoff || ''}
+                                onChange={(e) => setScheduleData(prev => ({
+                                  ...prev,
+                                  [m.id]: { ...prev[m.id], kickoff: e.target.value }
+                                }))}
+                                className="w-full bg-slate-700 text-white px-2 py-1 rounded text-xs" />
+                            </div>
+                            <div>
+                              <input
+                                placeholder="Venue"
+                                value={scheduleData[m.id]?.venue || ''}
+                                onChange={(e) => setScheduleData(prev => ({
+                                  ...prev,
+                                  [m.id]: { ...prev[m.id], venue: e.target.value }
+                                }))}
+                                className="w-full bg-slate-700 text-white px-2 py-1 rounded text-xs" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-6 border-t border-slate-700 flex gap-3">
+                <button onClick={handleBulkSchedule} disabled={scheduleSaving}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-6 py-2 rounded text-sm">
+                  {scheduleSaving ? 'Saving...' : 'Save Schedule'}
+                </button>
+                <button onClick={() => setShowScheduler(false)}
+                  className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* New Match Form */}
       {showForm && (
         <form onSubmit={handleCreate} className="bg-slate-800 p-6 rounded-lg mb-6 space-y-4">
@@ -235,153 +447,262 @@ export default function EditionMatches() {
       </div>
 
       {/* Match list */}
-      <div className="space-y-3">
-        {filteredMatches.length === 0 ? (
-          <p className="text-slate-500 text-center py-8">No matches found</p>
-        ) : filteredMatches.map((m) => (
-          <div key={m.id} className="bg-slate-800 rounded-lg" data-testid={`match-${m.id}`}>
-            {editingMatch === m.id ? (
-              // Inline edit form
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Home Team</label>
-                    <select value={editForm.homeTeamId} onChange={(e) => setEditForm({ ...editForm, homeTeamId: e.target.value })}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
-                      {(editForm.stage === 'group' && editForm.groupId
-                        ? teamsForGroup(editForm.groupId)
-                        : teams
-                      ).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Away Team</label>
-                    <select value={editForm.awayTeamId} onChange={(e) => setEditForm({ ...editForm, awayTeamId: e.target.value })}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
-                      {(editForm.stage === 'group' && editForm.groupId
-                        ? teamsForGroup(editForm.groupId)
-                        : teams
-                      ).filter(t => t.id !== editForm.homeTeamId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Stage</label>
-                    <select value={editForm.stage} onChange={(e) => setEditForm({ ...editForm, stage: e.target.value, groupId: '' })}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
-                      {availableStages.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-                    </select>
-                  </div>
-                  {showGroupSelect(editForm.stage) && (
-                    <div>
-                      <label className="block text-slate-400 text-xs mb-1">Group</label>
-                      <select value={editForm.groupId} onChange={(e) => setEditForm({ ...editForm, groupId: e.target.value })}
-                        className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
-                        <option value="">None</option>
-                        {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                      </select>
+      {filteredMatches.length === 0 ? (
+        <p className="text-slate-500 text-center py-8">No matches found</p>
+      ) : (() => {
+        // Sort: live first, then by matchday/stage order
+        const STATUS_ORDER = { live: 0, penalties: 1, scheduled: 2, completed: 3, postponed: 4, cancelled: 5 };
+        const STAGE_ORDER = ['group', 'round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
+
+        const kickoffMs = (m) => m.kickoff_datetime ? new Date(m.kickoff_datetime).getTime() : Infinity;
+
+        const sorted = [...filteredMatches].sort((a, b) => {
+          const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          if (statusDiff !== 0) return statusDiff;
+          if (a.stage === 'group' && b.stage === 'group') {
+            const mdDiff = (a.matchday ?? 99) - (b.matchday ?? 99);
+            if (mdDiff !== 0) return mdDiff;
+            return kickoffMs(a) - kickoffMs(b);
+          }
+          const stageDiff = STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage);
+          if (stageDiff !== 0) return stageDiff;
+          return kickoffMs(a) - kickoffMs(b);
+        });
+
+        // Group matches into sections
+        const sections = [];
+        const seen = new Set();
+
+        // Live section first
+        const liveMatches = sorted.filter(m => m.status === 'live' || m.status === 'penalties');
+        if (liveMatches.length > 0) {
+          sections.push({ label: '🔴 Live', matches: liveMatches });
+          liveMatches.forEach(m => seen.add(m.id));
+        }
+
+        // Group stage — group by matchday
+        const groupMatches = sorted.filter(m => m.stage === 'group' && !seen.has(m.id));
+        const matchdays = [...new Set(groupMatches.map(m => m.matchday))].sort((a, b) => (a ?? 99) - (b ?? 99));
+        matchdays.forEach(md => {
+          const mdMatches = groupMatches.filter(m => m.matchday === md);
+          sections.push({ label: md ? `Matchday ${md}` : 'Group Stage', matches: mdMatches });
+          mdMatches.forEach(m => seen.add(m.id));
+        });
+        // Group matches without matchday
+        const ungrouped = groupMatches.filter(m => !seen.has(m.id));
+        if (ungrouped.length > 0) {
+          sections.push({ label: 'Group Stage', matches: ungrouped });
+          ungrouped.forEach(m => seen.add(m.id));
+        }
+
+        // Knockout stages
+        const STAGE_LABELS = {
+          round_of_16: 'Round of 16', quarterfinal: 'Quarter Finals',
+          semifinal: 'Semi Finals', third_place: 'Third Place', final: 'Final',
+        };
+        STAGE_ORDER.filter(s => s !== 'group').forEach(stage => {
+          const stageMatches = sorted.filter(m => m.stage === stage && !seen.has(m.id));
+          if (stageMatches.length > 0) {
+            sections.push({ label: STAGE_LABELS[stage] || stage, matches: stageMatches });
+            stageMatches.forEach(m => seen.add(m.id));
+          }
+        });
+
+        return (
+          <div className="space-y-6">
+            {sections.map((section) => (
+              <div key={section.label}>
+                <h3 className={`text-xs font-semibold uppercase tracking-wider mb-2 px-1 ${
+                  section.label.startsWith('🔴') ? 'text-red-400' : 'text-slate-400'
+                }`}>{section.label}</h3>
+                <div className="space-y-2">
+                  {section.matches.map((m) => (
+                    <div key={m.id} className="bg-slate-800 rounded-lg" data-testid={`match-${m.id}`}>
+                      {editingMatch === m.id ? (
+                        // Inline edit form
+                        <div className="p-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Home Team</label>
+                              <select value={editForm.homeTeamId} onChange={(e) => setEditForm({ ...editForm, homeTeamId: e.target.value })}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
+                                {(editForm.stage === 'group' && editForm.groupId
+                                  ? teamsForGroup(editForm.groupId)
+                                  : teams
+                                ).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Away Team</label>
+                              <select value={editForm.awayTeamId} onChange={(e) => setEditForm({ ...editForm, awayTeamId: e.target.value })}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
+                                {(editForm.stage === 'group' && editForm.groupId
+                                  ? teamsForGroup(editForm.groupId)
+                                  : teams
+                                ).filter(t => t.id !== editForm.homeTeamId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Stage</label>
+                              <select value={editForm.stage} onChange={(e) => setEditForm({ ...editForm, stage: e.target.value, groupId: '' })}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
+                                {availableStages.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                              </select>
+                            </div>
+                            {showGroupSelect(editForm.stage) && (
+                              <div>
+                                <label className="block text-slate-400 text-xs mb-1">Group</label>
+                                <select value={editForm.groupId} onChange={(e) => setEditForm({ ...editForm, groupId: e.target.value })}
+                                  className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
+                                  <option value="">None</option>
+                                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                              </div>
+                            )}
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Status</label>
+                              <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
+                                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            {editForm.status === 'completed' && (
+                              <>
+                                <div>
+                                  <label className="block text-slate-400 text-xs mb-1">
+                                    Penalties — {teams.find(t => t.id === editForm.homeTeamId)?.name || 'Home'}
+                                  </label>
+                                  <input type="number" min="0"
+                                    value={editForm.homePenalties ?? ''}
+                                    onChange={(e) => setEditForm({ ...editForm, homePenalties: e.target.value })}
+                                    placeholder="e.g. 4"
+                                    className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                                </div>
+                                <div>
+                                  <label className="block text-slate-400 text-xs mb-1">
+                                    Penalties — {teams.find(t => t.id === editForm.awayTeamId)?.name || 'Away'}
+                                  </label>
+                                  <input type="number" min="0"
+                                    value={editForm.awayPenalties ?? ''}
+                                    onChange={(e) => setEditForm({ ...editForm, awayPenalties: e.target.value })}
+                                    placeholder="e.g. 3"
+                                    className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                                </div>
+                                <p className="col-span-2 text-slate-500 text-xs">Only fill penalties if the match was decided by a shootout</p>
+                              </>
+                            )}
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Kickoff</label>
+                              <input type="datetime-local" value={editForm.kickoff}
+                                onChange={(e) => setEditForm({ ...editForm, kickoff: e.target.value })}
+                                min={edition?.start_date ? `${edition.start_date}T00:00` : undefined}
+                                max={edition?.end_date ? `${edition.end_date}T23:59` : undefined}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 text-xs mb-1">Venue</label>
+                              <input value={editForm.venue} onChange={(e) => setEditForm({ ...editForm, venue: e.target.value })}
+                                className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={handleUpdate}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-sm">Save</button>
+                            <button onClick={() => setEditingMatch(null)}
+                              className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-1.5 rounded text-sm">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        // Display row
+                        <div className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {/* Home team */}
+                            <span className="text-white text-sm font-medium truncate flex-1 text-right">
+                              {teamMap[m.home_team_id]}
+                            </span>
+                            {/* Score / time */}
+                            <div className="shrink-0 text-center w-24">
+                              {m.status === 'scheduled' ? (
+                                <span className="text-slate-300 font-semibold text-sm">
+                                  {m.kickoff_datetime
+                                    ? new Date(m.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                                    : 'vs'}
+                                </span>
+                              ) : (
+                                <span className={`font-bold text-sm ${
+                                  m.status === 'live' ? 'text-red-400 animate-pulse' :
+                                  m.status === 'penalties' ? 'text-purple-400 animate-pulse' :
+                                  'text-emerald-400'
+                                }`}>
+                                  {m.home_score ?? 0}
+                                  {m.home_penalties != null && <span className="text-slate-400 text-xs font-normal"> ({m.home_penalties})</span>}
+                                  {' - '}
+                                  {m.away_penalties != null && <span className="text-slate-400 text-xs font-normal">({m.away_penalties}) </span>}
+                                  {m.away_score ?? 0}
+                                </span>
+                              )}
+                            </div>
+                            {/* Away team */}
+                            <span className="text-white text-sm font-medium truncate flex-1">
+                              {teamMap[m.away_team_id]}
+                            </span>
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 shrink-0 ml-1">
+                              {m.status === 'scheduled' && (
+                                <button onClick={async () => { await updateMatch(m.id, { status: 'live' }); loadData(); }}
+                                  className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">
+                                  Live
+                                </button>
+                              )}
+                              {m.status === 'live' && m.home_score === m.away_score && (
+                                <button onClick={async () => { await updateMatch(m.id, { status: 'penalties' }); loadData(); }}
+                                  className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded">
+                                  Pens
+                                </button>
+                              )}
+                              {(m.status === 'live' || m.status === 'penalties') && (
+                                <button onClick={async () => { await updateMatch(m.id, { status: 'completed' }); loadData(); }}
+                                  className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded">
+                                  Done
+                                </button>
+                              )}
+                              <button onClick={() => openEdit(m)}
+                                className="text-slate-400 hover:text-emerald-300 text-sm">Edit</button>
+                              <Link to={`/admin/matches/${m.id}/events`}
+                                className="text-emerald-400 hover:underline text-sm">Events</Link>
+                              <button onClick={() => handleDeleteMatch(m.id)}
+                                className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                            </div>
+                          </div>
+                          {/* Sub row */}
+                          <div className="flex items-center gap-3 mt-1 pl-1">
+                            {m.kickoff_datetime && (
+                              <span className="text-slate-500 text-xs">
+                                {new Date(m.kickoff_datetime).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                {' · '}
+                                {new Date(m.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            {m.venue && (
+                              <span className="text-slate-600 text-xs truncate">📍 {m.venue}</span>
+                            )}
+                            <span className={`text-xs ml-auto ${
+                              m.status === 'completed' ? 'text-green-500' :
+                              m.status === 'live' ? 'text-red-400 animate-pulse' :
+                              m.status === 'penalties' ? 'text-purple-400 animate-pulse' :
+                              'text-slate-600'
+                            }`}>● {m.status}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Status</label>
-                    <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm">
-                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  {editForm.status === 'completed' && (
-                    <>
-                      <div>
-                        <label className="block text-slate-400 text-xs mb-1">
-                          Penalties — {teams.find(t => t.id === editForm.homeTeamId)?.name || 'Home'}
-                        </label>
-                        <input type="number" min="0"
-                          value={editForm.homePenalties ?? ''}
-                          onChange={(e) => setEditForm({ ...editForm, homePenalties: e.target.value })}
-                          placeholder="e.g. 4"
-                          className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 text-xs mb-1">
-                          Penalties — {teams.find(t => t.id === editForm.awayTeamId)?.name || 'Away'}
-                        </label>
-                        <input type="number" min="0"
-                          value={editForm.awayPenalties ?? ''}
-                          onChange={(e) => setEditForm({ ...editForm, awayPenalties: e.target.value })}
-                          placeholder="e.g. 3"
-                          className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
-                      </div>
-                    <p className="col-span-2 text-slate-500 text-xs">Only fill penalties if the match was decided by a shootout</p>
-                    </>
-                  )}
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Kickoff</label>
-                    <input type="datetime-local" value={editForm.kickoff}
-                      onChange={(e) => setEditForm({ ...editForm, kickoff: e.target.value })}
-                      min={edition?.start_date ? `${edition.start_date}T00:00` : undefined}
-                      max={edition?.end_date ? `${edition.end_date}T23:59` : undefined}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-xs mb-1">Venue</label>
-                    <input value={editForm.venue} onChange={(e) => setEditForm({ ...editForm, venue: e.target.value })}
-                      className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={handleUpdate}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-sm">Save</button>
-                  <button onClick={() => setEditingMatch(null)}
-                    className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-1.5 rounded text-sm">Cancel</button>
+                  ))}
                 </div>
               </div>
-            ) : (
-              // Display row
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    m.status === 'completed' ? 'bg-slate-600' : m.status === 'live' ? 'bg-red-600' : 'bg-amber-600'
-                  } text-white`}>{m.stage.replace(/_/g, ' ')}</span>
-                  {m.group_id && groupMap[m.group_id] && (
-                    <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded">{groupMap[m.group_id]}</span>
-                  )}
-                  <span className="text-white">{teamMap[m.home_team_id]}</span>
-                  <span className="text-2xl font-bold text-emerald-400">{m.home_score ?? '-'}</span>
-                  <span className="text-slate-400">:</span>
-                  <span className="text-2xl font-bold text-emerald-400">{m.away_score ?? '-'}</span>
-                  <span className="text-white">{teamMap[m.away_team_id]}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    m.status === 'completed' ? 'bg-green-600' : m.status === 'live' ? 'bg-red-600' : 'bg-slate-600'
-                  } text-white`}>{m.status}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {m.status === 'scheduled' && (
-                    <button onClick={async () => { await updateMatch(m.id, { status: 'live' }); loadData(); }}
-                      className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">
-                      Mark Live
-                    </button>
-                  )}
-                  {m.status === 'live' && m.home_score === m.away_score && (
-                    <button onClick={async () => { await updateMatch(m.id, { status: 'penalties' }); loadData(); }}
-                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded">
-                      Penalties
-                    </button>
-                  )}
-                  {(m.status === 'live' || m.status === 'penalties') && (
-                    <button onClick={async () => { await updateMatch(m.id, { status: 'completed' }); loadData(); }}
-                      className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded">
-                      Mark Completed
-                    </button>
-                  )}
-                  <button onClick={() => openEdit(m)} className="text-emerald-400 hover:text-emerald-300 text-sm"
-                    data-testid={`edit-match-${m.id}`}>Edit</button>
-                  <Link to={`/admin/matches/${m.id}/events`} className="text-emerald-400 hover:underline text-sm">Events</Link>
-                  <button onClick={() => handleDeleteMatch(m.id)} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </div>
   );
 }

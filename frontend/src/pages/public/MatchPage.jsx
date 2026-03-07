@@ -2,20 +2,42 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPublicMatch, getPublicMatchEvents } from '../../lib/api';
 
+const LIVE_STATUSES = ['live', 'penalties'];
+const POLL_INTERVAL = 30000; // 30 seconds
+
 export default function MatchPage() {
   const { id } = useParams();
   const [match, setMatch] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const fetchData = async () => {
+    try {
+      const [matchRes, eventsRes] = await Promise.all([
+        getPublicMatch(id),
+        getPublicMatchEvents(id)
+      ]);
+      setMatch(matchRes.data);
+      setEvents(eventsRes.data);
+      setLastUpdated(new Date());
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    Promise.all([getPublicMatch(id), getPublicMatchEvents(id)])
-      .then(([matchRes, eventsRes]) => {
-        setMatch(matchRes.data);
-        setEvents(eventsRes.data);
-      })
-      .finally(() => setLoading(false));
+    fetchData();
   }, [id]);
+
+  // Poll every 30s when match is live
+  useEffect(() => {
+    if (!match) return;
+    if (!LIVE_STATUSES.includes(match.status)) return;
+
+    const interval = setInterval(fetchData, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [match?.status, id]);
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
   if (!match) return <div className="text-center py-12 text-red-400">Match not found</div>;
@@ -61,49 +83,108 @@ export default function MatchPage() {
       </Link>
 
       {/* Score card */}
-      <div className="bg-slate-800 rounded-lg p-8 mt-4 mb-6 text-center">
-        <div className="flex items-center justify-center gap-8 mb-4">
-          <div className="flex-1 text-right">
-            <h2 className={`text-2xl font-bold ${homeWon ? 'text-white' : 'text-slate-400'}`}>
+      <div className="bg-slate-800 rounded-lg p-6 mt-4 mb-6">
+        {/* Teams + Score */}
+        <div className="flex items-center justify-center gap-4 mb-4">
+          {/* Home team */}
+          <div className="flex-1 flex flex-col items-center gap-2">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-slate-600 bg-slate-700 flex items-center justify-center shrink-0">
+              {match.home_team_logo_url ? (
+                <img
+                  src={match.home_team_logo_url.startsWith('http') ? match.home_team_logo_url : `http://localhost:8000${match.home_team_logo_url}`}
+                  alt={match.home_team_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-emerald-400 font-bold text-lg">
+                  {match.home_team_name?.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </span>
+              )}
+            </div>
+            <h2 className={`text-base sm:text-lg font-bold text-center leading-tight ${homeWon ? 'text-white' : 'text-slate-300'}`}>
               {match.home_team_name}
             </h2>
           </div>
-          <div className="text-4xl font-bold text-emerald-400 text-center">
+
+          {/* Score / time */}
+          <div className="shrink-0 text-center w-28">
             {match.status === 'scheduled' ? (
-              'vs'
+              <>
+                <p className="text-3xl font-bold text-white">
+                  {match.kickoff_datetime
+                    ? new Date(match.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                    : 'TBC'}
+                </p>
+                {match.kickoff_datetime && (
+                  <p className="text-slate-500 text-xs mt-1">
+                    {new Date(match.kickoff_datetime).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </p>
+                )}
+              </>
             ) : (
               <>
-                {match.home_score}
+                <p className={`text-3xl sm:text-4xl font-bold ${
+                  match.status === 'live' || match.status === 'penalties' ? 'text-red-400 animate-pulse' : 'text-white'
+                }`}>
+                  {match.home_score}
+                  {' - '}
+                  {match.away_score}
+                </p>
                 {match.home_penalties != null && (
-                  <span className="text-2xl"> ({match.home_penalties})</span>
+                  <p className="text-slate-400 text-sm mt-0.5">
+                    ({match.home_penalties}) - ({match.away_penalties})
+                  </p>
                 )}
-                {' - '}
-                {match.away_score}
-                {match.away_penalties != null && (
-                  <span className="text-2xl"> ({match.away_penalties})</span>
-                )}
+                <p className={`text-xs mt-1 font-medium ${
+                  match.status === 'live' ? 'text-red-400 animate-pulse' :
+                  match.status === 'penalties' ? 'text-purple-400 animate-pulse' :
+                  'text-slate-500'
+                }`}>
+                  {match.status === 'live' ? 'LIVE' :
+                   match.status === 'penalties' ? 'PENALTIES' : 'FT'}
+                </p>
               </>
             )}
           </div>
-          <div className="flex-1 text-left">
-            <h2 className={`text-2xl font-bold ${awayWon ? 'text-white' : 'text-slate-400'}`}>
+
+          {/* Away team */}
+          <div className="flex-1 flex flex-col items-center gap-2">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-slate-600 bg-slate-700 flex items-center justify-center shrink-0">
+              {match.away_team_logo_url ? (
+                <img
+                  src={match.away_team_logo_url.startsWith('http') ? match.away_team_logo_url : `http://localhost:8000${match.away_team_logo_url}`}
+                  alt={match.away_team_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-emerald-400 font-bold text-lg">
+                  {match.away_team_name?.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </span>
+              )}
+            </div>
+            <h2 className={`text-base sm:text-lg font-bold text-center leading-tight ${awayWon ? 'text-white' : 'text-slate-300'}`}>
               {match.away_team_name}
             </h2>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-4 text-slate-400 text-sm">
+
+        {/* Match meta */}
+        <div className="flex items-center justify-center flex-wrap gap-2 text-slate-400 text-xs pt-3 border-t border-slate-700">
           <span className={`px-2 py-0.5 rounded ${
-            match.status === 'completed' ? 'bg-green-600' :
+            match.status === 'completed' ? 'bg-green-700' :
             match.status === 'live' ? 'bg-red-600 animate-pulse' :
             match.status === 'penalties' ? 'bg-purple-600 animate-pulse' :
             'bg-slate-600'
           } text-white`}>{match.status}</span>
-          <span>{match.stage.replace(/_/g, ' ')}</span>
-          {match.venue && <span>• {match.venue}</span>}
-          {match.kickoff_datetime && (
-            <span>• {new Date(match.kickoff_datetime).toLocaleString()}</span>
-          )}
+          <span className="capitalize">{match.stage.replace(/_/g, ' ')}</span>
+          {match.venue && <span>· {match.venue}</span>}
         </div>
+
+        {LIVE_STATUSES.includes(match.status) && lastUpdated && (
+          <p className="text-slate-600 text-xs text-center mt-2">
+            ⟳ Auto-refreshing every 30s · Last updated {lastUpdated.toLocaleTimeString()}
+          </p>
+        )}
       </div>
 
       {/* Penalty shootout card */}
@@ -161,25 +242,90 @@ export default function MatchPage() {
       )}
 
       {/* Match timeline */}
-      <div className="bg-slate-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 text-center">Match Timeline</h3>
+      <div className="bg-slate-800 rounded-lg p-4 sm:p-6">
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 text-center">
+          Match Events
+        </h3>
         {regularEvents.length === 0 ? (
-          <p className="text-slate-500 text-center py-4">No events recorded</p>
+          <p className="text-slate-500 text-center py-6 text-sm">No events recorded</p>
         ) : (
-          <div className="relative">
+          <div className="space-y-1">
             {regularEvents.map((e) => {
               const isHome = e.team_id === match.home_team_id;
               return (
-                <div key={e.id} className={`flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0 ${isHome ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <span className="text-slate-500 text-sm w-8 text-center">{e.minute}'</span>
-                  <span className="text-lg">{eventIcon(e.event_type)}</span>
-                  <div className={`flex flex-col ${isHome ? 'text-left' : 'text-right'}`}>
-                    <span className="text-white text-sm">{e.player_name || '—'}</span>
-                    <span className="text-slate-500 text-xs">{e.team_name}</span>
+                <div key={e.id} className="flex items-center gap-2">
+                  {/* Home side */}
+                  <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
+                    {isHome ? (
+                      <>
+                        <div className="text-right min-w-0">
+                          <p className="text-white text-sm font-medium truncate">
+                            {e.player_name || '—'}
+                          </p>
+                          {e.event_type === 'own_goal' && (
+                            <p className="text-red-400 text-xs">own goal</p>
+                          )}
+                          {e.event_type === 'penalty_scored' && (
+                            <p className="text-emerald-400 text-xs">penalty</p>
+                          )}
+                          {e.event_type === 'penalty_missed' && (
+                            <p className="text-red-400 text-xs">missed pen</p>
+                          )}
+                        </div>
+                        <span className="text-lg shrink-0">{eventIcon(e.event_type)}</span>
+                      </>
+                    ) : (
+                      <span className="text-transparent select-none">·</span>
+                    )}
+                  </div>
+
+                  {/* Center: minute */}
+                  <div className="shrink-0 w-12 text-center">
+                    <span className="text-slate-400 text-xs font-mono bg-slate-700 px-1.5 py-0.5 rounded">
+                      {e.minute}'
+                    </span>
+                  </div>
+
+                  {/* Away side */}
+                  <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
+                    {!isHome ? (
+                      <>
+                        <span className="text-lg shrink-0">{eventIcon(e.event_type)}</span>
+                        <div className="text-left min-w-0">
+                          <p className="text-white text-sm font-medium truncate">
+                            {e.player_name || '—'}
+                          </p>
+                          {e.event_type === 'own_goal' && (
+                            <p className="text-red-400 text-xs">own goal</p>
+                          )}
+                          {e.event_type === 'penalty_scored' && (
+                            <p className="text-emerald-400 text-xs">penalty</p>
+                          )}
+                          {e.event_type === 'penalty_missed' && (
+                            <p className="text-red-400 text-xs">missed pen</p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-transparent select-none">·</span>
+                    )}
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Column headers */}
+        {regularEvents.length > 0 && (
+          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-700">
+            <div className="flex-1 text-right">
+              <span className="text-slate-500 text-xs">{match.home_team_name}</span>
+            </div>
+            <div className="w-12" />
+            <div className="flex-1 text-left">
+              <span className="text-slate-500 text-xs">{match.away_team_name}</span>
+            </div>
           </div>
         )}
       </div>

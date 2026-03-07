@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, Organiser, Tournament, Edition, EditionFormat, EditionStatus
+import random
+from datetime import date
+from app.models import User, Organiser, Tournament, Edition, EditionFormat, EditionStatus, Team, Group, GroupTeam
+from pydantic import BaseModel
+from typing import Optional
 from app.deps import get_current_user
 from app.schemas.edition import EditionCreate, EditionUpdate, EditionResponse
 
@@ -103,3 +107,103 @@ async def get_alive_teams(id: UUID, db: AsyncSession = Depends(get_db), user: Us
     
     alive = [t for tid, t in all_teams.items() if tid not in losers]
     return [{"id": str(t.id), "name": t.name, "logo_url": t.logo_url} for t in alive]
+
+class CloneEditionRequest(BaseModel):
+    name: str
+    year: int
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    venue: Optional[str] = None
+
+
+@router.post("/{id}/clone", status_code=201)
+async def clone_edition(
+    id: UUID,
+    req: CloneEditionRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Clone an edition — copies teams and groups, randomly reassigns teams to groups"""
+
+    # Verify ownership of source edition
+    result = await db.execute(
+        select(Edition).join(Tournament).join(Organiser).where(
+            Edition.id == id,
+            Organiser.owner_user_id == user.id,
+            Edition.deleted_at.is_(None)
+        )
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="Edition not found")
+
+    # Create new edition
+    new_edition = Edition(
+        tournament_id=source.tournament_id,
+        name=req.name,
+        year=req.year,
+        format=source.format,
+        status=EditionStatus.UPCOMING,
+        venue=req.venue or source.venue,
+        start_date=req.start_date or None,
+        end_date=req.end_date or None,
+    )
+    db.add(new_edition)
+    await db.flush()
+
+    # Copy teams (name only, no players)
+    teams_result = await db.execute(
+        select(Team).where(Team.edition_id == id, Team.deleted_at.is_(None))
+    )
+    source_teams = teams_result.scalars().all()
+
+    new_teams = []
+    for t in source_teams:
+        new_team = Team(
+            edition_id=new_edition.id,
+            name=t.name,
+            coach_name=t.coach_name,
+        )
+        db.add(new_team)
+        new_teams.append(new_team)
+    await db.flush()
+
+    # Copy groups
+    groups_result = await db.execute(
+        select(Group).where(Group.edition_id == id, Group.deleted_at.is_(None))
+    )
+    source_groups = groups_result.scalars().all()
+
+    if source_groups and new_teams:
+        new_groups = []
+        for g in source_groups:
+            new_group = Group(
+                edition_id=new_edition.id,
+                name=g.name,
+            )
+            db.add(new_group)
+            new_groups.append(new_group)
+        await db.flush()
+
+        # Randomly assign teams to groups evenly
+        shuffled_teams = new_teams.copy()
+        random.shuffle(shuffled_teams)
+
+        for i, team in enumerate(shuffled_teams):
+            group = new_groups[i % len(new_groups)]
+            assignment = GroupTeam(
+                group_id=group.id,
+                team_id=team.id,
+            )
+            db.add(assignment)
+
+    await db.commit()
+
+    return {
+        "id": str(new_edition.id),
+        "name": new_edition.name,
+        "year": new_edition.year,
+        "teams_cloned": len(new_teams),
+        "groups_cloned": len(source_groups) if source_groups else 0,
+    }
+

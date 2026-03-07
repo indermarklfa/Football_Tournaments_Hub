@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPublicEdition, getPublicFixtures, getPublicTeams, getPublicTopScorers, getPublicDiscipline, getPublicPlayers, getPublicStandings } from '../../lib/api';
 
@@ -66,21 +66,40 @@ export default function EditionPage() {
       <Link to={`/tournaments/${edition.tournament_id}`} className="text-emerald-400 text-sm hover:underline">
         ← Back to {edition.tournament_name}
       </Link>
-      <h1 className="text-3xl font-bold text-white mt-4 mb-2">{edition.name}</h1>
-      <div className="flex items-center gap-4 text-slate-400 text-sm mb-6">
-        <span>{edition.venue || 'Venue TBA'}</span>
-        <span>•</span>
-        <span>{edition.start_date} - {edition.end_date}</span>
-        <span className={`px-2 py-0.5 rounded ${
-          edition.status === 'completed' ? 'bg-slate-600' :
-          edition.status === 'active' ? 'bg-emerald-600' : 'bg-amber-600'
-        } text-white`}>{edition.status}</span>
+
+      {/* Edition header */}
+      <div className="flex items-start gap-4 mt-4 mb-6">
+        {/* Tournament logo */}
+        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0 overflow-hidden border-2 border-slate-600 bg-slate-700 flex items-center justify-center">
+          {edition.tournament_logo_url ? (
+            <img
+              src={edition.tournament_logo_url.startsWith('http') ? edition.tournament_logo_url : `http://localhost:8000${edition.tournament_logo_url}`}
+              alt={edition.tournament_name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-emerald-400 font-bold text-xl">
+              {edition.tournament_name?.[0]}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 leading-tight">{edition.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-slate-400">
+            <span className={`px-2 py-0.5 rounded text-xs ${
+              edition.status === 'completed' ? 'bg-slate-600' :
+              edition.status === 'active' ? 'bg-emerald-600' : 'bg-amber-600'
+            } text-white`}>{edition.status}</span>
+            {edition.venue && <span className="text-xs">📍 {edition.venue}</span>}
+            {edition.start_date && <span className="text-xs">📅 {edition.start_date}{edition.end_date ? ` – ${edition.end_date}` : ''}</span>}
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-slate-800 p-1 rounded-lg overflow-x-auto">
+      <div className="flex gap-1 mb-6 bg-slate-800 p-1 rounded-lg overflow-x-auto scrollbar-hide">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`py-2 px-3 rounded text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
               tab === t.id ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
             }`} data-testid={`tab-${t.id}`}>{t.label}</button>
         ))}
@@ -96,14 +115,124 @@ export default function EditionPage() {
           semifinal: 'Semi Finals', third_place: 'Third Place', final: 'Final',
         };
 
-        const grouped = STAGE_ORDER.reduce((acc, stage) => {
-          const matches = filtered.filter(m => m.stage === stage);
-          if (matches.length > 0) acc[stage] = matches;
+        const formatKickoff = (dt) => {
+          if (!dt) return null;
+          const d = new Date(dt);
+          return {
+            date: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+            time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          };
+        };
+
+        // Group stage: group by matchday, then by date within matchday
+        // Other stages: group by stage
+        const groupMatches = filtered.filter(m => m.stage === 'group');
+        const knockoutMatches = filtered.filter(m => m.stage !== 'group');
+
+        // Build matchday groups
+        const matchdays = [...new Set(groupMatches.map(m => m.matchday))]
+          .filter(Boolean)
+          .sort((a, b) => a - b);
+        const unscheduledGroup = groupMatches.filter(m => !m.matchday);
+
+        // Build knockout groups
+        const knockoutGrouped = STAGE_ORDER.filter(s => s !== 'group').reduce((acc, stage) => {
+          const ms = knockoutMatches.filter(m => m.stage === stage);
+          if (ms.length > 0) acc[stage] = ms;
           return acc;
         }, {});
 
+        const TeamLogo = ({ logoUrl, name, size = 'sm' }) => {
+          const API_BASE = 'http://localhost:8000';
+          const src = logoUrl ? (logoUrl.startsWith('http') ? logoUrl : `${API_BASE}${logoUrl}`) : null;
+          const dim = size === 'sm' ? 'w-5 h-5' : size === 'md' ? 'w-7 h-7' : 'w-6 h-6';
+          return (
+            <div className={`${dim} rounded-full shrink-0 overflow-hidden bg-slate-700 border border-slate-600 flex items-center justify-center`}>
+              {src ? (
+                <img src={src} alt={name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-emerald-400 font-bold" style={{ fontSize: '8px' }}>
+                  {name?.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </span>
+              )}
+            </div>
+          );
+        };
+
+        const MatchCard = ({ m, showDate = false }) => {
+          const kickoff = formatKickoff(m.kickoff_datetime);
+          const isKnockout = m.stage !== 'group';
+
+          const centerContent = () => {
+            if (m.status === 'scheduled') {
+              return (
+                <div className="flex flex-col items-center">
+                  <span className="text-white font-semibold text-sm">
+                    {kickoff ? kickoff.time : 'TBC'}
+                  </span>
+                  {isKnockout && kickoff && (
+                    <span className="text-slate-500 text-xs mt-0.5">{kickoff.date}</span>
+                  )}
+                </div>
+              );
+            }
+            if (m.status === 'live' || m.status === 'penalties') {
+              return (
+                <div className="flex flex-col items-center">
+                  <span className="text-red-400 font-bold text-sm animate-pulse">
+                    {m.home_score}
+                    {m.home_penalties != null && <span className="text-xs font-normal">({m.home_penalties})</span>}
+                    {' - '}
+                    {m.away_penalties != null && <span className="text-xs font-normal">({m.away_penalties})</span>}
+                    {m.away_score}
+                  </span>
+                  <span className="text-red-500 text-xs animate-pulse mt-0.5">
+                    {m.status === 'penalties' ? 'PENS' : 'LIVE'}
+                  </span>
+                </div>
+              );
+            }
+            // completed
+            return (
+              <div className="flex flex-col items-center">
+                <span className="text-white font-bold text-sm">
+                  {m.home_score}
+                  {m.home_penalties != null && <span className="text-slate-400 text-xs font-normal"> ({m.home_penalties})</span>}
+                  {' - '}
+                  {m.away_penalties != null && <span className="text-slate-400 text-xs font-normal">({m.away_penalties}) </span>}
+                  {m.away_score}
+                </span>
+                <span className="text-slate-500 text-xs mt-0.5">
+                  {isKnockout && kickoff ? kickoff.date : 'FT'}
+                </span>
+              </div>
+            );
+          };
+
+          return (
+            <Link to={`/matches/${m.id}`}
+              className="block bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg px-4 py-4 transition-colors"
+              data-testid={`fixture-${m.id}`}>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+                  <span className="text-white text-base truncate font-semibold">{m.home_team_name}</span>
+                  <TeamLogo logoUrl={m.home_team_logo_url} name={m.home_team_name} size="md" />
+                </div>
+                <div className="shrink-0 w-20 flex justify-center">
+                  {centerContent()}
+                </div>
+                <div className="flex items-center gap-2 flex-1 justify-start min-w-0">
+                  <TeamLogo logoUrl={m.away_team_logo_url} name={m.away_team_name} size="md" />
+                  <span className="text-white text-base truncate font-semibold">{m.away_team_name}</span>
+                </div>
+              </div>
+            </Link>
+          );
+        };
+
         return (
           <div className="space-y-6">
+            {/* Filter */}
             <div className="flex gap-2">
               {['all', 'scheduled', 'live', 'completed'].map(f => (
                 <button key={f} onClick={() => setFixtureFilter(f)}
@@ -112,102 +241,193 @@ export default function EditionPage() {
                   }`}>{f}</button>
               ))}
             </div>
-            {Object.keys(grouped).length === 0 ? (
+
+            {filtered.length === 0 ? (
               <p className="text-slate-500 text-center py-8">No fixtures found</p>
-            ) : Object.entries(grouped).map(([stage, matches]) => (
-              <div key={stage}>
-                <h3 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
-                  {STAGE_LABELS[stage] || stage.replace('_', ' ')}
-                </h3>
-                <div className="space-y-2">
-                  {matches.map((m) => (
-                    <Link key={m.id} to={`/matches/${m.id}`}
-                      className="flex items-center justify-between bg-slate-800 hover:bg-slate-700 p-4 rounded-lg"
-                      data-testid={`fixture-${m.id}`}>
-                      <div className="flex items-center gap-4 flex-1 justify-center">
-                        <span className="text-white text-right w-36 truncate">{m.home_team_name}</span>
-                        <span className="text-2xl font-bold text-emerald-400 text-center whitespace-nowrap">
-                          {m.status === 'scheduled' ? 'vs' : (
-                            <>
-                              {m.home_score}{m.home_penalties != null ? <span className="text-base"> ({m.home_penalties})</span> : ''}
-                              {' - '}
-                              {m.away_score}{m.away_penalties != null ? <span className="text-base"> ({m.away_penalties})</span> : ''}
-                            </>
-                          )}
-                        </span>
-                        <span className="text-white text-left w-36 truncate">{m.away_team_name}</span>
+            ) : (
+              <>
+                {/* Group stage by matchday */}
+                {matchdays.map(matchday => {
+                  const dayMatches = groupMatches.filter(m => m.matchday === matchday);
+                  // Get date for this matchday if available
+                  const firstDate = dayMatches.find(m => m.kickoff_datetime)?.kickoff_datetime;
+                  const dateLabel = firstDate
+                    ? new Date(firstDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+                    : null;
+                  return (
+                    <div key={matchday}>
+                      <div className="flex items-baseline gap-3 mb-3 px-1">
+                        <h3 className="text-white font-semibold">Matchday {matchday}</h3>
+                        {dateLabel && <span className="text-slate-500 text-xs">{dateLabel}</span>}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {m.kickoff_datetime && (
-                          <span className="text-slate-500 text-xs hidden md:block">
-                            {new Date(m.kickoff_datetime).toLocaleDateString()}
-                          </span>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          m.status === 'completed' ? 'bg-green-600' :
-                          m.status === 'live' ? 'bg-red-600 animate-pulse' : 'bg-slate-600'
-                        } text-white`}>{m.status}</span>
+                      <div className="space-y-2">
+                        {dayMatches.map(m => <MatchCard key={m.id} m={m} />)}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    </div>
+                  );
+                })}
+
+                {/* Group matches without matchday */}
+                {unscheduledGroup.length > 0 && (
+                  <div>
+                    <h3 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
+                      Group Stage
+                    </h3>
+                    <div className="space-y-2">
+                      {unscheduledGroup.map(m => <MatchCard key={m.id} m={m} />)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Knockout stages */}
+                {Object.entries(knockoutGrouped).map(([stage, matches]) => (
+                  <div key={stage}>
+                    <h3 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
+                      {STAGE_LABELS[stage] || stage.replace('_', ' ')}
+                    </h3>
+                    <div className="space-y-2">
+                      {matches.map(m => <MatchCard key={m.id} m={m} />)}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         );
       })()}
 
       {/* TEAMS TAB */}
       {tab === 'teams' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            {teams.map((t) => (
-              <div key={t.id}
-                onClick={() => handleSelectTeam(t)}
-                className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                  selectedTeam?.id === t.id
-                    ? 'bg-emerald-600/20 border border-emerald-600'
-                    : 'bg-slate-800 hover:bg-slate-700'
-                }`}
-                data-testid={`team-card-${t.id}`}>
-                <h3 className="text-white font-medium">{t.name}</h3>
-                {t.coach_name && <p className="text-slate-400 text-sm">{t.coach_name}</p>}
-              </div>
-            ))}
+        <div className="space-y-4">
+          {/* Team selector dropdown */}
+          <div className="relative">
+            <select
+              onChange={(e) => {
+                const team = teams.find(t => t.id === e.target.value);
+                if (team) handleSelectTeam(team);
+                else setSelectedTeam(null);
+              }}
+              value={selectedTeam?.id || ''}
+              className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-sm">
+              <option value="">Select a team...</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▾</span>
           </div>
-          <div className="bg-slate-800 rounded-lg p-4">
-            {!selectedTeam ? (
-              <p className="text-slate-500 text-center py-8">Select a team to view their squad</p>
-            ) : squadLoading ? (
-              <p className="text-slate-400 text-center py-8">Loading...</p>
-            ) : (
-              <>
-                <h3 className="text-white font-semibold mb-4">{selectedTeam.name}</h3>
-                {squad.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No players registered</p>
+
+          {/* All teams grid — shown when no team selected */}
+          {!selectedTeam && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {teams.map((t) => (
+                <div key={t.id}
+                  onClick={() => handleSelectTeam(t)}
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700/50 hover:border-emerald-600/50 p-4 rounded-lg cursor-pointer transition-colors"
+                  data-testid={`team-card-${t.id}`}>
+                  {t.logo_url ? (
+                    <img
+                      src={t.logo_url.startsWith('http') ? t.logo_url : `http://localhost:8000${t.logo_url}`}
+                      alt={t.name}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-700 mb-3"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-emerald-700/30 flex items-center justify-center mb-3">
+                      <span className="text-emerald-400 font-bold text-sm">
+                        {t.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                      </span>
+                    </div>
+                  )}
+                  <h3 className="text-white font-medium text-sm leading-tight">{t.name}</h3>
+                  {t.coach_name && <p className="text-slate-500 text-xs mt-1">{t.coach_name}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Squad view — shown when team selected */}
+          {selectedTeam && (
+            <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700/50">
+              {/* Team header */}
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-slate-700">
+                {selectedTeam.logo_url ? (
+                  <img
+                    src={selectedTeam.logo_url.startsWith('http') ? selectedTeam.logo_url : `http://localhost:8000${selectedTeam.logo_url}`}
+                    alt={selectedTeam.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-slate-600 shrink-0"
+                  />
                 ) : (
-                  <div className="space-y-2">
-                    {squad.map((p) => (
-                      <div key={p.id} className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
-                        {p.jersey_number && (
-                          <span className="text-emerald-400 font-mono text-sm w-6 text-center">#{p.jersey_number}</span>
-                        )}
-                        <span className="text-white flex-1">{p.name}</span>
-                        {p.position && (
-                          <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded uppercase">
-                            {p.position === 'goalkeeper' ? 'GK' :
-                             p.position === 'defender' ? 'DEF' :
-                             p.position === 'midfielder' ? 'MID' :
-                             p.position === 'forward' ? 'FWD' : p.position}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                  <div className="w-12 h-12 rounded-full bg-emerald-700/30 flex items-center justify-center shrink-0">
+                    <span className="text-emerald-400 font-bold">
+                      {selectedTeam.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                    </span>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-semibold text-lg leading-tight">{selectedTeam.name}</h3>
+                  {selectedTeam.coach_name && (
+                    <p className="text-slate-400 text-sm">Coach: {selectedTeam.coach_name}</p>
+                  )}
+                </div>
+                <button onClick={() => setSelectedTeam(null)}
+                  className="text-slate-500 hover:text-white text-sm px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 shrink-0">
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Squad list */}
+              {squadLoading ? (
+                <p className="text-slate-400 text-center py-8 text-sm">Loading squad...</p>
+              ) : squad.length === 0 ? (
+                <p className="text-slate-500 text-center py-8 text-sm">No players registered</p>
+              ) : (
+                <>
+                  {/* Group by position */}
+                  {['goalkeeper', 'defender', 'midfielder', 'forward'].map(pos => {
+                    const posPlayers = squad.filter(p => p.position === pos);
+                    if (posPlayers.length === 0) return null;
+                    const posLabel = { goalkeeper: 'Goalkeepers', defender: 'Defenders', midfielder: 'Midfielders', forward: 'Forwards' }[pos];
+                    const posShort = { goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD' }[pos];
+                    return (
+                      <div key={pos}>
+                        <div className="px-4 py-2 bg-slate-700/40">
+                          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">{posLabel}</span>
+                        </div>
+                        {posPlayers.sort((a, b) => (a.jersey_number || 99) - (b.jersey_number || 99)).map((p) => (
+                          <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/30 last:border-0">
+                            <span className="text-emerald-400 font-mono text-sm w-7 text-center shrink-0">
+                              {p.jersey_number ? `#${p.jersey_number}` : '—'}
+                            </span>
+                            <span className="text-white text-sm flex-1">{p.name}</span>
+                            <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded">{posShort}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {/* Players with no position */}
+                  {squad.filter(p => !p.position).length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 bg-slate-700/40">
+                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Other</span>
+                      </div>
+                      {squad.filter(p => !p.position).map((p) => (
+                        <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/30 last:border-0">
+                          <span className="text-emerald-400 font-mono text-sm w-7 text-center shrink-0">
+                            {p.jersey_number ? `#${p.jersey_number}` : '—'}
+                          </span>
+                          <span className="text-white text-sm flex-1">{p.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="px-4 py-3 bg-slate-700/20">
+                    <span className="text-slate-500 text-xs">{squad.length} players registered</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -221,10 +441,11 @@ export default function EditionPage() {
               <div className="bg-slate-700 px-4 py-3">
                 <h3 className="text-white font-semibold">{group.name}</h3>
               </div>
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-max">
                 <thead className="bg-slate-700/50">
                   <tr>
-                    <th className="text-left px-4 py-2 text-slate-400 text-xs">Team</th>
+                    <th className="text-left px-3 py-2 text-slate-400 text-xs sticky left-0 bg-slate-700/50">Team</th>
                     <th className="text-center px-2 py-2 text-slate-400 text-xs">P</th>
                     <th className="text-center px-2 py-2 text-slate-400 text-xs">W</th>
                     <th className="text-center px-2 py-2 text-slate-400 text-xs">D</th>
@@ -238,22 +459,23 @@ export default function EditionPage() {
                 <tbody>
                   {group.standings.map((row, i) => (
                     <tr key={row.team_id} className={`border-t border-slate-700 ${i < 2 ? 'bg-emerald-900/10' : ''}`}>
-                      <td className="px-4 py-3 text-white text-sm">
+                      <td className="px-3 py-2.5 text-white text-sm sticky left-0 bg-slate-800">
                         {i < 2 && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 mb-0.5"></span>}
                         {row.team_name}
                       </td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.p}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.w}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.d}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.l}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.gf}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.ga}</td>
-                      <td className="px-2 py-3 text-center text-slate-400 text-sm">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-                      <td className="px-3 py-3 text-center text-emerald-400 font-bold text-sm">{row.pts}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.p}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.w}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.d}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.l}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.gf}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.ga}</td>
+                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+                      <td className="px-3 py-2.5 text-center text-emerald-400 font-bold text-sm">{row.pts}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
               <div className="px-4 py-2 bg-slate-700/20">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 mb-0.5"></span>
                 <span className="text-slate-500 text-xs">Qualifies to next round</span>
@@ -409,40 +631,66 @@ export default function EditionPage() {
           final: 'Final',
         };
 
-        return (
-          <div className="overflow-x-auto pb-4 pt-2">
-            {/* Header row — separate from cards so all headers align */}
-            <div className="flex gap-6 min-w-max mb-8">
-              {activeStages.map((stage) => (
-                <div key={stage} style={{ width: 224, minHeight: 24 }}
-                  className="text-slate-400 text-xs font-semibold uppercase tracking-wider text-center">
-                  {STAGE_LABELS[stage] || stage}
-                </div>
-              ))}
-            </div>
-            {/* Cards row */}
-            <div className="flex gap-10 min-w-max items-start">
-              {activeStages.map((stage, stageIndex) => {
-                const matches = orderedColumns[stageIndex] || [];
-                const span = Math.pow(2, stageIndex);
+        const BracketContent = () => {
+          const containerRef = useRef(null);
+          const [scale, setScale] = useState(1);
 
-                return (
-                  <div key={stage} className="relative" style={{ width: 224, height: colHeight }}>
-                    {matches.map((match, i) => {
-                      const topCenter = (i * span + span / 2 - 0.5) * SLOT_HEIGHT;
-                      const topPos = topCenter - CARD_HEIGHT / 2;
-                      return (
-                        <div key={i} className="absolute" style={{ top: topPos, left: 0 }}>
-                          <MatchCard match={match} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+          useEffect(() => {
+            const updateScale = () => {
+              if (!containerRef.current) return;
+              const containerWidth = containerRef.current.offsetWidth;
+              const bracketWidth = activeStages.length * 224 + (activeStages.length - 1) * 40;
+              const newScale = Math.min(1, containerWidth / bracketWidth);
+              setScale(newScale);
+            };
+            updateScale();
+            window.addEventListener('resize', updateScale);
+            return () => window.removeEventListener('resize', updateScale);
+          }, [activeStages.length]);
+
+          return (
+            <div ref={containerRef} className="w-full overflow-hidden pb-4 pt-2">
+              <div style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+                width: scale < 1 ? `${100 / scale}%` : '100%',
+                height: scale < 1 ? `${(colHeight + 60) * scale}px` : 'auto',
+              }}>
+                {/* Header row */}
+                <div className="flex gap-10 min-w-max mb-6">
+                  {activeStages.map((stage) => (
+                    <div key={stage} style={{ width: 224 }}
+                      className="text-slate-400 text-xs font-semibold uppercase tracking-wider text-center">
+                      {STAGE_LABELS[stage] || stage}
+                    </div>
+                  ))}
+                </div>
+                {/* Cards */}
+                <div className="flex gap-10 min-w-max items-start">
+                  {activeStages.map((stage, stageIndex) => {
+                    const matches = orderedColumns[stageIndex] || [];
+                    const span = Math.pow(2, stageIndex);
+                    return (
+                      <div key={stage} className="relative" style={{ width: 224, height: colHeight }}>
+                        {matches.map((match, i) => {
+                          const topCenter = (i * span + span / 2 - 0.5) * SLOT_HEIGHT;
+                          const topPos = topCenter - CARD_HEIGHT / 2 + 40;
+                          return (
+                            <div key={i} className="absolute" style={{ top: topPos, left: 0 }}>
+                              <MatchCard match={match} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        );
+          );
+        };
+
+        return <BracketContent />;
       })()}
 
       {/* TOP SCORERS TAB */}
@@ -451,19 +699,22 @@ export default function EditionPage() {
           <table className="w-full">
             <thead className="bg-slate-700">
               <tr>
-                <th className="text-left px-4 py-3 text-slate-300 text-sm">#</th>
-                <th className="text-left px-4 py-3 text-slate-300 text-sm">Player</th>
-                <th className="text-left px-4 py-3 text-slate-300 text-sm">Team</th>
-                <th className="text-center px-4 py-3 text-slate-300 text-sm">Goals</th>
+                <th className="text-left px-3 py-2.5 text-slate-300 text-xs">#</th>
+                <th className="text-left px-3 py-2.5 text-slate-300 text-xs">Player</th>
+                <th className="text-left px-3 py-2.5 text-slate-300 text-xs hidden sm:table-cell">Team</th>
+                <th className="text-center px-3 py-2.5 text-slate-300 text-xs">⚽</th>
               </tr>
             </thead>
             <tbody>
               {topScorers.map((s, i) => (
                 <tr key={s.player_id} className="border-t border-slate-700" data-testid={`scorer-${s.player_id}`}>
-                  <td className="px-4 py-3 text-slate-400">{i + 1}</td>
-                  <td className="px-4 py-3 text-white">{s.player_name}</td>
-                  <td className="px-4 py-3 text-slate-400">{s.team_name}</td>
-                  <td className="px-4 py-3 text-center text-emerald-400 font-bold">{s.goals}</td>
+                  <td className="px-3 py-2.5 text-slate-400 text-sm">{i + 1}</td>
+                  <td className="px-3 py-2.5">
+                    <p className="text-white text-sm">{s.player_name}</p>
+                    <p className="text-slate-500 text-xs sm:hidden">{s.team_name}</p>
+                  </td>
+                  <td className="px-3 py-2.5 text-slate-400 text-sm hidden sm:table-cell">{s.team_name}</td>
+                  <td className="px-3 py-2.5 text-center text-emerald-400 font-bold">{s.goals}</td>
                 </tr>
               ))}
               {topScorers.length === 0 && (
@@ -480,21 +731,24 @@ export default function EditionPage() {
           <table className="w-full">
             <thead className="bg-slate-700">
               <tr>
-                <th className="text-left px-4 py-3 text-slate-300 text-sm">Player</th>
-                <th className="text-left px-4 py-3 text-slate-300 text-sm">Team</th>
-                <th className="text-center px-4 py-3 text-yellow-400 text-sm">🟨</th>
-                <th className="text-center px-4 py-3 text-red-400 text-sm">🟥</th>
-                <th className="text-center px-4 py-3 text-slate-300 text-sm">Total</th>
+                <th className="text-left px-3 py-2.5 text-slate-300 text-xs">Player</th>
+                <th className="text-left px-3 py-2.5 text-slate-300 text-xs hidden sm:table-cell">Team</th>
+                <th className="text-center px-3 py-2.5 text-yellow-400 text-xs">🟨</th>
+                <th className="text-center px-3 py-2.5 text-red-400 text-xs">🟥</th>
+                <th className="text-center px-3 py-2.5 text-slate-300 text-xs">Total</th>
               </tr>
             </thead>
             <tbody>
               {discipline.map((d) => (
                 <tr key={d.player_id} className="border-t border-slate-700" data-testid={`discipline-${d.player_id}`}>
-                  <td className="px-4 py-3 text-white">{d.player_name}</td>
-                  <td className="px-4 py-3 text-slate-400">{d.team_name}</td>
-                  <td className="px-4 py-3 text-center text-yellow-400">{d.yellow_cards}</td>
-                  <td className="px-4 py-3 text-center text-red-400">{d.red_cards}</td>
-                  <td className="px-4 py-3 text-center text-white font-bold">{d.total}</td>
+                  <td className="px-3 py-2.5">
+                    <p className="text-white text-sm">{d.player_name}</p>
+                    <p className="text-slate-500 text-xs sm:hidden">{d.team_name}</p>
+                  </td>
+                  <td className="px-3 py-2.5 text-slate-400 text-sm hidden sm:table-cell">{d.team_name}</td>
+                  <td className="px-3 py-2.5 text-center text-yellow-400 font-medium">{d.yellow_cards}</td>
+                  <td className="px-3 py-2.5 text-center text-red-400 font-medium">{d.red_cards}</td>
+                  <td className="px-3 py-2.5 text-center text-white font-bold">{d.total}</td>
                 </tr>
               ))}
               {discipline.length === 0 && (

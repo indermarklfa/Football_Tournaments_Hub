@@ -102,4 +102,30 @@ export const getPublicMatch = (id) => api.get(`/api/public/matches/${id}`);
 export const getPublicMatchEvents = (matchId) => api.get(`/api/public/matches/${matchId}/events`);
 export const getPublicPlayers = (teamId) => api.get(`/api/public/teams/${teamId}/players`);
 
+// Super Admin
+export const getAdminOrganiserAccounts = () => api.get('/api/admin/organiser-accounts');
+export const createAdminOrganiserAccount = (data) => api.post('/api/admin/organiser-accounts', data);
+export const deleteAdminOrganiserAccount = (userId) => api.delete(`/api/admin/organiser-accounts/${userId}`);
+export const getAdminAllTournaments = () => api.get('/api/admin/tournaments');
+export const moveAdminTournament = (tournamentId, organiserId) => api.patch(`/api/admin/tournaments/${tournamentId}/move`, { organiser_id: organiserId });
+export const changePassword = (data) => api.post('/api/auth/change-password', data);
+export const resetOrganiserPassword = (userId, newPassword) => api.post(`/api/admin/organiser-accounts/${userId}/reset-password`, { new_password: newPassword });
+export const generateGroupFixtures = (data) => api.post('/api/matches/generate-group-fixtures', data);
+export const bulkUpdateMatches = (data) => api.post('/api/matches/bulk-update', data);
+export const cloneEdition = (id, data) => api.post(`/api/editions/${id}/clone`, data);
+
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/image`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  return res.json();
+};
+
 export default api;

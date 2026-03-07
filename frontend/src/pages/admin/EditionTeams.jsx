@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getEdition, getTeams, createTeam, updateTeam, deleteTeam, getPlayers, createPlayer, updatePlayer, deletePlayer } from '../../lib/api';
+import ImageUpload from '../../components/ImageUpload';
 
 const POSITIONS = [
   { value: 'goalkeeper', label: 'GK' },
@@ -20,6 +21,7 @@ export default function EditionTeams() {
   const [editingTeam, setEditingTeam] = useState(null);
   const [editTeamName, setEditTeamName] = useState('');
   const [editTeamCoach, setEditTeamCoach] = useState('');
+  const [editTeamLogo, setEditTeamLogo] = useState('');
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '' });
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', number: '', position: '' });
@@ -41,11 +43,12 @@ export default function EditionTeams() {
     setEditingTeam(t.id);
     setEditTeamName(t.name);
     setEditTeamCoach(t.coach_name || '');
+    setEditTeamLogo(t.logo_url || '');
   };
 
   const handleEditTeamSave = async (teamId) => {
     if (!editTeamName.trim()) return;
-    await updateTeam(teamId, { name: editTeamName, coach_name: editTeamCoach || null });
+    await updateTeam(teamId, { name: editTeamName, coach_name: editTeamCoach || null, logo_url: editTeamLogo || null });
     setEditingTeam(null);
     const res = await getTeams(id);
     setTeams(res.data);
@@ -163,6 +166,12 @@ export default function EditionTeams() {
                       placeholder="Team name *" className="w-full bg-slate-600 text-white px-2 py-1 rounded text-sm" />
                     <input value={editTeamCoach} onChange={(e) => setEditTeamCoach(e.target.value)}
                       placeholder="Coach name (optional)" className="w-full bg-slate-600 text-white px-2 py-1 rounded text-sm" />
+                    <ImageUpload
+                      currentUrl={editTeamLogo}
+                      onUpload={(url) => setEditTeamLogo(url)}
+                      label="Team Logo"
+                      size="sm"
+                    />
                     <div className="flex gap-1">
                       <button onClick={() => handleEditTeamSave(t.id)}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-xs">Save</button>
@@ -173,9 +182,22 @@ export default function EditionTeams() {
                 ) : (
                   <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700/70 rounded"
                     onClick={() => selectTeam(t.id)} data-testid={`team-${t.id}`}>
-                    <div>
-                      <span className="text-white">{t.name}</span>
-                      {t.coach_name && <p className="text-slate-400 text-xs">{t.coach_name}</p>}
+                    <div className="flex items-center gap-2">
+                      {t.logo_url ? (
+                        <img
+                          src={t.logo_url.startsWith('http') ? t.logo_url : `http://localhost:8000${t.logo_url}`}
+                          alt="logo"
+                          className="w-8 h-8 rounded-full object-cover border border-slate-600 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-emerald-700/30 flex items-center justify-center shrink-0">
+                          <span className="text-emerald-400 text-xs font-bold">{t.name[0]}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-white">{t.name}</span>
+                        {t.coach_name && <p className="text-slate-400 text-xs">{t.coach_name}</p>}
+                      </div>
                     </div>
                     <div className="flex gap-3">
                       <button onClick={(e) => { e.stopPropagation(); startEditTeam(t); }}

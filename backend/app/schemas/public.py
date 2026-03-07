@@ -21,7 +21,8 @@ class PublicTournamentResponse(BaseModel):
 class PublicEditionResponse(BaseModel):
     id: UUID
     tournament_id: UUID
-    tournament_name: Optional[str] = None
+    tournament_name: str
+    tournament_logo_url: Optional[str] = None
     name: str
     year: int
     start_date: Optional[date]
@@ -51,13 +52,15 @@ class PublicFixtureResponse(BaseModel):
     kickoff_datetime: Optional[datetime]
     venue: Optional[str]
     home_team_id: UUID
-    home_team_name: Optional[str] = None
+    home_team_name: Optional[str]
+    home_team_logo_url: Optional[str] = None
     away_team_id: UUID
-    away_team_name: Optional[str] = None
+    away_team_name: Optional[str]
+    away_team_logo_url: Optional[str] = None
     home_score: Optional[int]
     away_score: Optional[int]
-    home_penalties: Optional[int] = None
-    away_penalties: Optional[int] = None
+    home_penalties: Optional[int]
+    away_penalties: Optional[int]
     status: str
 
     class Config:

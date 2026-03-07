@@ -1,12 +1,18 @@
 """FastAPI main application"""
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.settings import get_settings
-from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public, groups
+from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public, groups, admin, uploads
 
 settings = get_settings()
 
 app = FastAPI(title="Football Tournament Platform", version="1.0.0")
+
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +32,8 @@ app.include_router(matches.router, prefix="/api")
 app.include_router(match_events.router, prefix="/api")
 app.include_router(groups.router, prefix="/api")
 app.include_router(public.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(uploads.router)
 
 
 @app.get("/api/health")

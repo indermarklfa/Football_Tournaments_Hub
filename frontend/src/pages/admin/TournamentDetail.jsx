@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getTournament, getEditions, updateTournament, updateEdition } from '../../lib/api';
+import { getTournament, getEditions, updateTournament, updateEdition, cloneEdition } from '../../lib/api';
+import ImageUpload from '../../components/ImageUpload';
 
 export default function TournamentDetail() {
   const { id } = useParams();
@@ -14,10 +15,16 @@ export default function TournamentDetail() {
   const [editTournamentName, setEditTournamentName] = useState('');
   const [editTournamentDesc, setEditTournamentDesc] = useState('');
   const [editTournamentAgeGroup, setEditTournamentAgeGroup] = useState('');
+  const [editTournamentLogo, setEditTournamentLogo] = useState('');
 
   // Edition edit state
   const [editingEdition, setEditingEdition] = useState(null);
   const [editEditionForm, setEditEditionForm] = useState({});
+
+  const [cloningEdition, setCloningEdition] = useState(null);
+  const [cloneForm, setCloneForm] = useState({ name: '', year: '', venue: '', start_date: '', end_date: '' });
+  const [cloneError, setCloneError] = useState('');
+  const [cloning, setCloning] = useState(false);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -33,11 +40,12 @@ export default function TournamentDetail() {
     setEditTournamentName(tournament.name);
     setEditTournamentDesc(tournament.description || '');
     setEditTournamentAgeGroup(tournament.age_group || '');
+    setEditTournamentLogo(tournament.logo_url || '');
     setEditingTournament(true);
   };
 
   const handleSaveTournament = async () => {
-    await updateTournament(id, { name: editTournamentName, description: editTournamentDesc, age_group: editTournamentAgeGroup || null });
+    await updateTournament(id, { name: editTournamentName, description: editTournamentDesc, age_group: editTournamentAgeGroup || null, logo_url: editTournamentLogo || null });
     setEditingTournament(false);
     await loadData();
   };
@@ -89,6 +97,32 @@ export default function TournamentDetail() {
     await loadData();
   };
 
+
+  const handleClone = async () => {
+    if (!cloneForm.name.trim() || !cloneForm.year) {
+      setCloneError('Name and year are required');
+      return;
+    }
+    setCloning(true);
+    setCloneError('');
+    try {
+      const res = await cloneEdition(cloningEdition.id, {
+        name: cloneForm.name,
+        year: parseInt(cloneForm.year),
+        venue: cloneForm.venue || null,
+        start_date: cloneForm.start_date || null,
+        end_date: cloneForm.end_date || null,
+      });
+      setCloningEdition(null);
+      await loadData();
+      alert(`✓ Cloned successfully — ${res.data.teams_cloned} teams and ${res.data.groups_cloned} groups copied with random assignments`);
+    } catch (err) {
+      setCloneError(err.response?.data?.detail || 'Failed to clone edition');
+    } finally {
+      setCloning(false);
+    }
+  };
+
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
   if (!tournament) return <div className="text-center py-12 text-red-400">Tournament not found</div>;
 
@@ -105,6 +139,12 @@ export default function TournamentDetail() {
             <textarea value={editTournamentDesc} onChange={(e) => setEditTournamentDesc(e.target.value)}
               placeholder="Description" rows={2}
               className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+            <ImageUpload
+              currentUrl={editTournamentLogo}
+              onUpload={(url) => setEditTournamentLogo(url)}
+              label="Tournament Logo"
+              size="md"
+            />
             <select value={editTournamentAgeGroup} onChange={(e) => setEditTournamentAgeGroup(e.target.value)}
               className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm">
               <option value="">None / Open</option>
@@ -127,7 +167,15 @@ export default function TournamentDetail() {
           </div>
         ) : (
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex items-center gap-4">
+              {tournament.logo_url && (
+                <img
+                  src={tournament.logo_url.startsWith('http') ? tournament.logo_url : `http://localhost:8000${tournament.logo_url}`}
+                  alt="logo"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-slate-600 shrink-0"
+                />
+              )}
+              <div>
               <h1 className="text-3xl font-bold text-white">{tournament.name}</h1>
               <div className="flex items-center gap-2 mt-1">
                 {tournament.age_group && (
@@ -135,6 +183,7 @@ export default function TournamentDetail() {
                 )}
                 <p className="text-slate-400">{tournament.description || 'No description'}</p>
               </div>
+            </div>
             </div>
             <div className="flex gap-2 ml-4">
               <button onClick={startEditTournament}
@@ -259,6 +308,12 @@ export default function TournamentDetail() {
                       className="text-emerald-400 hover:underline text-sm">Teams</Link>
                     <Link to={`/admin/editions/${e.id}/matches`}
                       className="text-emerald-400 hover:underline text-sm">Matches</Link>
+                    <button onClick={() => {
+                      setCloningEdition(e);
+                      setCloneForm({ name: `${e.name} (Copy)`, year: new Date().getFullYear() + 1, venue: e.venue || '', start_date: '', end_date: '' });
+                      setCloneError('');
+                    }}
+                      className="text-slate-400 hover:text-white text-sm">Clone</button>
                     <button onClick={() => handleDeleteEdition(e)}
                       className="text-red-400 hover:text-red-300 text-sm">Delete</button>
                   </div>
@@ -266,6 +321,69 @@ export default function TournamentDetail() {
               )}
             </div>
           ))}
+        </div>
+      )}
+      {/* Clone modal */}
+      {cloningEdition && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-white font-semibold mb-1">Clone Edition</h2>
+            <p className="text-slate-400 text-sm mb-4">
+              Cloning: <span className="text-white">{cloningEdition.name}</span>
+              <br />
+              <span className="text-xs text-slate-500">Teams and groups will be copied. Team assignments will be randomised. No matches will be copied.</span>
+            </p>
+            {cloneError && <div className="bg-red-900/50 text-red-300 text-sm p-2 rounded mb-3">{cloneError}</div>}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">New Name *</label>
+                  <input value={cloneForm.name}
+                    onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
+                    placeholder="e.g. Wizzo Cup 2026"
+                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+                </div>
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">Year *</label>
+                  <input type="number" value={cloneForm.year}
+                    onChange={(e) => setCloneForm({ ...cloneForm, year: e.target.value })}
+                    placeholder="2026"
+                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-slate-300 text-sm mb-1">Venue</label>
+                <input value={cloneForm.venue}
+                  onChange={(e) => setCloneForm({ ...cloneForm, venue: e.target.value })}
+                  placeholder={cloningEdition.venue || 'Same as original'}
+                  className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">Start Date</label>
+                  <input type="date" value={cloneForm.start_date}
+                    onChange={(e) => setCloneForm({ ...cloneForm, start_date: e.target.value })}
+                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+                </div>
+                <div>
+                  <label className="block text-slate-300 text-sm mb-1">End Date</label>
+                  <input type="date" value={cloneForm.end_date}
+                    onChange={(e) => setCloneForm({ ...cloneForm, end_date: e.target.value })}
+                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button onClick={handleClone} disabled={cloning}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm">
+                {cloning ? 'Cloning...' : 'Clone Edition'}
+              </button>
+              <button onClick={() => { setCloningEdition(null); setCloneError(''); }}
+                className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -17,7 +17,10 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await apiLogin(email, password);
-      login(res.data.access_token, { email });
+      localStorage.setItem('token', res.data.access_token);
+      const { getMe } = await import('../../lib/api');
+      const meRes = await getMe();
+      login(res.data.access_token, meRes.data);
       navigate('/admin/dashboard');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed');
@@ -50,9 +53,6 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <p className="text-slate-400 text-center mt-4">
-          No account? <Link to="/admin/register" className="text-emerald-400 hover:underline">Register</Link>
-        </p>
       </div>
     </div>
   );
