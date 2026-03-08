@@ -12,13 +12,14 @@ router = APIRouter(prefix="/groups", tags=["groups"])
 
 
 async def verify_edition_ownership(db: AsyncSession, edition_id: UUID, user: User):
+    if user.role.value == 'admin':
+        return
     result = await db.execute(
         select(Edition).join(Tournament).join(Organiser)
         .where(Edition.id == edition_id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=403, detail="Edition not owned by user")
-
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_group(edition_id: UUID, name: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):

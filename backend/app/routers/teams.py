@@ -13,12 +13,13 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 
 
 async def verify_edition_ownership(db: AsyncSession, edition_id: UUID, user: User):
+    if user.role.value == 'admin':
+        return
     result = await db.execute(
         select(Edition).join(Tournament).join(Organiser).where(Edition.id == edition_id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=403, detail="Edition not owned by user")
-
 
 async def get_team_with_ownership(db: AsyncSession, team_id: UUID, user: User) -> Team:
     result = await db.execute(

@@ -135,20 +135,41 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">Super Admin</h1>
-        <p className="text-slate-400 mt-1">Manage all organisers and tournaments</p>
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">KasiHub</p>
+        <h1 className="text-3xl font-black text-white">Super Admin</h1>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">{accounts.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Organisers</p>
+        </div>
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">{tournaments.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Tournaments</p>
+        </div>
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">
+            {new Set(tournaments.map(t => t.age_group).filter(Boolean)).size}
+          </p>
+          <p className="text-slate-500 text-xs mt-1">Age Groups</p>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-800 p-1 rounded-lg w-fit">
+      <div className="flex gap-0 mb-6 border-b border-slate-800">
         {[
           { id: 'organisers', label: `Organisers (${accounts.length})` },
           { id: 'tournaments', label: `All Tournaments (${tournaments.length})` },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`py-2 px-5 rounded text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+            className={`py-2.5 px-5 text-sm font-medium transition-colors border-b-2 ${
+              tab === t.id
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}>{t.label}</button>
         ))}
       </div>
@@ -414,7 +435,7 @@ export default function SuperAdminDashboard() {
         </div>
       )}
       {/* Change Password */}
-      <div className="bg-slate-800 rounded-lg p-6 mt-6">
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mt-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Security</h2>
           <button onClick={() => setShowChangePassword(!showChangePassword)}

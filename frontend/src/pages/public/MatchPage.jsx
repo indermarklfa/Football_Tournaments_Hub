@@ -123,9 +123,11 @@ export default function MatchPage() {
               </>
             ) : (
               <>
-                <p className={`text-3xl sm:text-4xl font-bold ${
-                  match.status === 'live' || match.status === 'penalties' ? 'text-red-400 animate-pulse' : 'text-white'
-                }`}>
+                <p className={`text-3xl sm:text-4xl font-bold tabular-nums ${
+                  match.status === 'live' || match.status === 'penalties' ? 'text-red-400' : 'text-white'
+                }`} style={match.status === 'live' || match.status === 'penalties' ? {
+                  animation: 'livePulse 2s ease-in-out infinite'
+                } : {}}>
                   {match.home_score}
                   {' - '}
                   {match.away_score}

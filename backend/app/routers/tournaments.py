@@ -37,9 +37,14 @@ async def list_tournaments(organiser_id: UUID, db: AsyncSession = Depends(get_db
 
 @router.get("/{id}", response_model=TournamentResponse)
 async def get_tournament(id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(
-        select(Tournament).join(Organiser).where(Tournament.id == id, Organiser.owner_user_id == user.id, Tournament.deleted_at.is_(None))
-    )
+    if user.role.value == 'admin':
+        result = await db.execute(
+            select(Tournament).where(Tournament.id == id, Tournament.deleted_at.is_(None))
+        )
+    else:
+        result = await db.execute(
+            select(Tournament).join(Organiser).where(Tournament.id == id, Organiser.owner_user_id == user.id, Tournament.deleted_at.is_(None))
+        )
     t = result.scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=404, detail="Tournament not found")

@@ -81,12 +81,39 @@ export default function OrganiserDashboard() {
   if (error) return <div className="text-center py-12 text-red-400">{error}</div>;
   if (!organiser) return <div className="text-center py-12 text-slate-400">No organiser profile found.</div>;
 
+  const liveTournaments = tournaments.filter(t => t.status === 'active');
+  const upcomingTournaments = tournaments.filter(t => t.status === 'upcoming');
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Welcome back</p>
+        <h1 className="text-3xl font-black text-white">{organiser?.name}</h1>
+        {organiser?.location && <p className="text-slate-500 text-sm mt-0.5">📍 {organiser.location}</p>}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">{tournaments.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Tournaments</p>
+        </div>
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">{liveTournaments.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Active</p>
+          {liveTournaments.length > 0 && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mt-1" />
+          )}
+        </div>
+        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
+          <p className="text-emerald-400 font-black text-3xl">{upcomingTournaments.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Upcoming</p>
+        </div>
+      </div>
 
       {/* Profile Card */}
-      <div className="bg-slate-800 rounded-lg p-6 mb-6">
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Your Profile</h2>
           {!editingOrg && (
@@ -141,43 +168,43 @@ export default function OrganiserDashboard() {
         )}
       </div>
 
-      {/* Tournaments Card */}
-      <div className="bg-slate-800 rounded-lg p-6">
+      {/* Tournaments */}
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Tournaments</h2>
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Your Tournaments</h2>
           <Link to={`/admin/tournaments/new?organiser_id=${organiser.id}`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm">
-            + New Tournament
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+            + New
           </Link>
         </div>
 
         {tournaments.length === 0 ? (
-          <p className="text-slate-500 text-sm text-center py-4">
-            No tournaments yet. Create one to get started!
+          <p className="text-slate-500 text-sm text-center py-6">
+            No tournaments yet — create one to get started.
           </p>
         ) : (
           <div className="space-y-2">
             {tournaments.map((t) => (
-              <div key={t.id} className="bg-slate-700/50 rounded p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-white">{t.name}</span>
-                  {t.age_group && (
-                    <span className="ml-2 text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded">
-                      {t.age_group}
-                    </span>
-                  )}
+              <Link key={t.id} to={`/admin/tournaments/${t.id}`}
+                className="group flex items-center gap-3 bg-slate-700/30 hover:bg-slate-700/60 border border-slate-700/30 hover:border-slate-600/50 rounded-lg px-4 py-3 transition-all">
+                <div className="w-0.5 self-stretch rounded-full bg-slate-600 group-hover:bg-emerald-500 transition-colors shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{t.name}</p>
                 </div>
-                <Link to={`/admin/tournaments/${t.id}`}
-                  className="text-emerald-400 hover:underline text-sm">
-                  Manage →
-                </Link>
-              </div>
+                {t.age_group && (
+                  <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+                    {t.age_group}
+                  </span>
+                )}
+                <span className="text-slate-600 group-hover:text-emerald-400 transition-colors text-lg shrink-0">›</span>
+              </Link>
             ))}
           </div>
         )}
       </div>
+
       {/* Change Password Card */}
-      <div className="bg-slate-800 rounded-lg p-6 mt-6">
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mt-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Security</h2>
           <button onClick={() => { setShowChangePassword(!showChangePassword); setPasswordError(''); setPasswordSuccess(''); }}

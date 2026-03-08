@@ -62,48 +62,147 @@ export default function EditionPage() {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4" data-testid="edition-page">
-      <Link to={`/tournaments/${edition.tournament_id}`} className="text-emerald-400 text-sm hover:underline">
-        ← Back to {edition.tournament_name}
-      </Link>
+    <div className="min-h-screen" data-testid="edition-page">
 
-      {/* Edition header */}
-      <div className="flex items-start gap-4 mt-4 mb-6">
-        {/* Tournament logo */}
-        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0 overflow-hidden border-2 border-slate-600 bg-slate-700 flex items-center justify-center">
-          {edition.tournament_logo_url ? (
-            <img
-              src={edition.tournament_logo_url.startsWith('http') ? edition.tournament_logo_url : `http://localhost:8000${edition.tournament_logo_url}`}
-              alt={edition.tournament_name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-emerald-400 font-bold text-xl">
-              {edition.tournament_name?.[0]}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 leading-tight">{edition.name}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-slate-400">
-            <span className={`px-2 py-0.5 rounded text-xs ${
-              edition.status === 'completed' ? 'bg-slate-600' :
-              edition.status === 'active' ? 'bg-emerald-600' : 'bg-amber-600'
-            } text-white`}>{edition.status}</span>
-            {edition.venue && <span className="text-xs">📍 {edition.venue}</span>}
-            {edition.start_date && <span className="text-xs">📅 {edition.start_date}{edition.end_date ? ` – ${edition.end_date}` : ''}</span>}
+      {/* ── HERO HEADER ── */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950" />
+        <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="pitch3" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+              <rect width="120" height="120" fill="none" stroke="#10b981" strokeWidth="0.5"/>
+              <circle cx="60" cy="60" r="30" fill="none" stroke="#10b981" strokeWidth="0.5"/>
+              <line x1="60" y1="0" x2="60" y2="120" stroke="#10b981" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#pitch3)"/>
+        </svg>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-emerald-500/8 rounded-full blur-3xl" />
+
+        <div className="relative max-w-5xl mx-auto px-4 pt-5 pb-8">
+          <Link to={`/tournaments/${edition.tournament_id}`}
+            className="text-slate-500 hover:text-emerald-400 text-sm transition-colors">
+            ← Back to {edition.tournament_name}
+          </Link>
+
+          <div className="flex items-center gap-4 mt-5">
+            {/* Logo */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl shrink-0 overflow-hidden border-2 border-slate-700 bg-slate-800 flex items-center justify-center shadow-xl shadow-black/40">
+              {edition.tournament_logo_url ? (
+                <img
+                  src={edition.tournament_logo_url.startsWith('http') ? edition.tournament_logo_url : `http://localhost:8000${edition.tournament_logo_url}`}
+                  alt={edition.tournament_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-emerald-400 font-black text-2xl">
+                  {edition.tournament_name?.[0]}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight tracking-tight">
+                {edition.name}
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
+                  edition.status === 'active'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : edition.status === 'upcoming'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    : 'bg-slate-700/50 text-slate-400 border-slate-600/30'
+                }`}>
+                  {edition.status === 'active' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5 mb-px" />}
+                  {edition.status}
+                </span>
+                {edition.venue && (
+                  <span className="text-slate-500 text-xs">📍 {edition.venue}</span>
+                )}
+                {edition.start_date && (
+                  <span className="text-slate-500 text-xs">
+                    📅 {edition.start_date}{edition.end_date ? ` – ${edition.end_date}` : ''}
+                  </span>
+                )}
+                <span className="text-slate-600 text-xs capitalize">
+                  {edition.format?.replace(/_/g, ' ')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-6 mt-5 pt-4 border-t border-slate-800/80">
+            <div>
+              <p className="text-emerald-400 font-bold text-lg leading-none">{teams.length}</p>
+              <p className="text-slate-500 text-xs mt-0.5">Teams</p>
+            </div>
+            {fixtures.length > 0 && (
+              <>
+                <div className="w-px h-7 bg-slate-800" />
+                <div>
+                  <p className="text-emerald-400 font-bold text-lg leading-none">{fixtures.length}</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Fixtures</p>
+                </div>
+              </>
+            )}
+            {fixtures.filter(f => f.status === 'completed').length > 0 && (
+              <>
+                <div className="w-px h-7 bg-slate-800" />
+                <div>
+                  <p className="text-emerald-400 font-bold text-lg leading-none">
+                    {fixtures.filter(f => f.status === 'completed').length}
+                  </p>
+                  <p className="text-slate-500 text-xs mt-0.5">Played</p>
+                </div>
+              </>
+            )}
+            {topScorers.length > 0 && (
+              <>
+                <div className="w-px h-7 bg-slate-800" />
+                <div>
+                  <p className="text-emerald-400 font-bold text-lg leading-none">
+                    {topScorers.reduce((sum, s) => sum + s.goals, 0)}
+                  </p>
+                  <p className="text-slate-500 text-xs mt-0.5">Goals</p>
+                </div>
+              </>
+            )}
+            {fixtures.some(f => f.status === 'live') && (
+              <>
+                <div className="w-px h-7 bg-slate-800" />
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                  <p className="text-red-400 text-xs font-semibold">Live</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-slate-800 p-1 rounded-lg overflow-x-auto scrollbar-hide">
-        {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`py-2 px-3 rounded text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-              tab === t.id ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
-            }`} data-testid={`tab-${t.id}`}>{t.label}</button>
-        ))}
+      {/* ── TAB BAR ── */}
+      <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="flex gap-0 overflow-x-auto scrollbar-hide">
+            {tabs.map((t) => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`py-3 px-4 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${
+                  tab === t.id
+                    ? 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+                data-testid={`tab-${t.id}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* ── CONTENT ── */}
+      <div className="max-w-5xl mx-auto px-4 py-6">
 
       {/* FIXTURES TAB */}
       {tab === 'fixtures' && (() => {
@@ -437,48 +536,106 @@ export default function EditionPage() {
           {standings.length === 0 ? (
             <p className="text-slate-500 text-center py-8">No group standings available</p>
           ) : standings.map((group) => (
-            <div key={group.id} className="bg-slate-800 rounded-lg overflow-hidden">
-              <div className="bg-slate-700 px-4 py-3">
-                <h3 className="text-white font-semibold">{group.name}</h3>
+            <div key={group.id} className="rounded-xl overflow-hidden border border-slate-700/50">
+              {/* Group header */}
+              <div className="bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-700/50">
+                <h3 className="text-white font-bold text-sm uppercase tracking-wider">{group.name}</h3>
+                <span className="text-slate-500 text-xs">{group.standings.length} teams</span>
               </div>
+
               <div className="overflow-x-auto">
-              <table className="w-full min-w-max">
-                <thead className="bg-slate-700/50">
-                  <tr>
-                    <th className="text-left px-3 py-2 text-slate-400 text-xs sticky left-0 bg-slate-700/50">Team</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">P</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">W</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">D</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">L</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">GF</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">GA</th>
-                    <th className="text-center px-2 py-2 text-slate-400 text-xs">GD</th>
-                    <th className="text-center px-3 py-2 text-emerald-400 text-xs font-bold">PTS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.standings.map((row, i) => (
-                    <tr key={row.team_id} className={`border-t border-slate-700 ${i < 2 ? 'bg-emerald-900/10' : ''}`}>
-                      <td className="px-3 py-2.5 text-white text-sm sticky left-0 bg-slate-800">
-                        {i < 2 && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 mb-0.5"></span>}
-                        {row.team_name}
-                      </td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.p}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.w}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.d}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.l}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.gf}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.ga}</td>
-                      <td className="px-2 py-2.5 text-center text-slate-400 text-sm">{row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-                      <td className="px-3 py-2.5 text-center text-emerald-400 font-bold text-sm">{row.pts}</td>
+                <table className="w-full min-w-max">
+                  <thead>
+                    <tr className="bg-slate-800/80">
+                      <th className="text-left px-4 py-2.5 text-slate-500 text-xs font-medium sticky left-0 bg-slate-800/80 w-8">#</th>
+                      <th className="text-left px-3 py-2.5 text-slate-500 text-xs font-medium sticky left-8 bg-slate-800/80">Team</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">P</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">W</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">D</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">L</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">GF</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">GA</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 text-xs font-medium">GD</th>
+                      <th className="text-center px-4 py-2.5 text-emerald-400 text-xs font-bold">PTS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-              <div className="px-4 py-2 bg-slate-700/20">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 mb-0.5"></span>
-                <span className="text-slate-500 text-xs">Qualifies to next round</span>
+                  </thead>
+                  <tbody>
+                    {group.standings.map((row, i) => {
+                      const isTop = i === 0;
+                      const isSecond = i === 1;
+                      const isQualify = i < 2 && standings.length > 1;
+                      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+
+                      return (
+                        <tr key={row.team_id} className={`border-t border-slate-700/40 transition-colors ${
+                          isTop ? 'bg-emerald-950/30 hover:bg-emerald-950/50' :
+                          isSecond ? 'bg-emerald-950/15 hover:bg-emerald-950/30' :
+                          'bg-slate-800/40 hover:bg-slate-800/80'
+                        }`}>
+                          {/* Rank */}
+                          <td className={`px-4 py-3 text-xs font-bold sticky left-0 ${
+                            isTop ? 'bg-emerald-950/30' :
+                            isSecond ? 'bg-emerald-950/15' :
+                            'bg-slate-800/40'
+                          }`}>
+                            {medal ? (
+                              <span className="text-sm">{medal}</span>
+                            ) : (
+                              <span className="text-slate-600">{i + 1}</span>
+                            )}
+                          </td>
+
+                          {/* Team name */}
+                          <td className={`px-3 py-3 sticky left-8 ${
+                            isTop ? 'bg-emerald-950/30' :
+                            isSecond ? 'bg-emerald-950/15' :
+                            'bg-slate-800/40'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              {isQualify && (
+                                <span className="w-1 h-4 rounded-full bg-emerald-500 shrink-0" />
+                              )}
+                              <span className={`text-sm font-medium ${isTop ? 'text-white' : isSecond ? 'text-white' : 'text-slate-300'}`}>
+                                {row.team_name}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-3 py-3 text-center text-slate-400 text-sm">{row.p}</td>
+                          <td className="px-3 py-3 text-center text-sm font-medium text-slate-300">{row.w}</td>
+                          <td className="px-3 py-3 text-center text-slate-500 text-sm">{row.d}</td>
+                          <td className="px-3 py-3 text-center text-slate-500 text-sm">{row.l}</td>
+                          <td className="px-3 py-3 text-center text-slate-400 text-sm">{row.gf}</td>
+                          <td className="px-3 py-3 text-center text-slate-400 text-sm">{row.ga}</td>
+                          <td className={`px-3 py-3 text-center text-sm font-medium ${
+                            row.gd > 0 ? 'text-emerald-400' : row.gd < 0 ? 'text-red-400' : 'text-slate-500'
+                          }`}>
+                            {row.gd > 0 ? `+${row.gd}` : row.gd}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`text-sm font-black ${isTop ? 'text-emerald-300' : isSecond ? 'text-emerald-400' : 'text-white'}`}>
+                              {row.pts}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Legend */}
+              <div className="px-4 py-2.5 bg-slate-800/60 border-t border-slate-700/30 flex items-center gap-4">
+                {standings.length > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-slate-500 text-xs">Qualifies</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">🥇</span>
+                  <span className="text-slate-500 text-xs">{standings.length > 1 ? 'Group winner' : 'League leader'}</span>
+                </div>
               </div>
             </div>
           ))}
@@ -758,6 +915,7 @@ export default function EditionPage() {
           </table>
         </div>
       )}
+    </div>
     </div>
   );
 }

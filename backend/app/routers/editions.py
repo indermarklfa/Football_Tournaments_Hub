@@ -17,6 +17,8 @@ router = APIRouter(prefix="/editions", tags=["editions"])
 
 
 async def verify_tournament_ownership(db: AsyncSession, tournament_id: UUID, user: User):
+    if user.role.value == 'admin':
+        return
     result = await db.execute(
         select(Tournament).join(Organiser).where(Tournament.id == tournament_id, Organiser.owner_user_id == user.id, Tournament.deleted_at.is_(None))
     )
@@ -39,16 +41,22 @@ async def create_edition(req: EditionCreate, db: AsyncSession = Depends(get_db),
 
 @router.get("", response_model=list[EditionResponse])
 async def list_editions(tournament_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await verify_tournament_ownership(db, tournament_id, user)
+    if user.role.value != 'admin':
+        await verify_tournament_ownership(db, tournament_id, user)
     result = await db.execute(select(Edition).where(Edition.tournament_id == tournament_id, Edition.deleted_at.is_(None)))
     return result.scalars().all()
 
 
 @router.get("/{id}", response_model=EditionResponse)
 async def get_edition(id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(
-        select(Edition).join(Tournament).join(Organiser).where(Edition.id == id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
-    )
+    if user.role.value == 'admin':
+        result = await db.execute(
+            select(Edition).where(Edition.id == id, Edition.deleted_at.is_(None))
+        )
+    else:
+        result = await db.execute(
+            select(Edition).join(Tournament).join(Organiser).where(Edition.id == id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
+        )
     e = result.scalar_one_or_none()
     if not e:
         raise HTTPException(status_code=404, detail="Edition not found")
