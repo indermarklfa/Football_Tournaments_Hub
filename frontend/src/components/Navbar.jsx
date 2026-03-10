@@ -11,7 +11,7 @@ export default function Navbar() {
   return (
     <nav className="bg-slate-900 text-white px-4 py-3 sticky top-0 z-40 border-b border-slate-800" data-testid="navbar">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold tracking-tight text-white">KasiHub</Link>
+        <Link to="/" className="text-xl font-bold tracking-tight text-white">PitchBase</Link>
 
         {/* Desktop nav */}
         <div className="hidden sm:flex items-center gap-6">

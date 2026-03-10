@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createEdition, getTournament } from '../../lib/api';
+import { createSeason, getCompetition } from '../../lib/api';
 
 export default function NewEdition() {
   const [searchParams] = useSearchParams();
-  const tournamentId = searchParams.get('tournament_id');
-  const [tournament, setTournament] = useState(null);
+  const competitionId = searchParams.get('competition_id');
+  const [competition, setCompetition] = useState(null);
   const [name, setName] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [venue, setVenue] = useState('');
@@ -17,20 +17,20 @@ export default function NewEdition() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (tournamentId) {
-      getTournament(tournamentId).then((res) => {
-        setTournament(res.data);
+    if (competitionId) {
+      getCompetition(competitionId).then((res) => {
+        setCompetition(res.data);
         setName(`${res.data.name} ${year}`);
       });
     }
-  }, [tournamentId, year]);
+  }, [competitionId, year]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await createEdition({
-        tournament_id: tournamentId,
+      const res = await createSeason({
+        competition_id: competitionId,
         name,
         year: parseInt(year),
         venue: venue || null,
@@ -39,7 +39,7 @@ export default function NewEdition() {
         start_date: startDate || null,
         end_date: endDate || null,
       });
-      navigate(`/admin/editions/${res.data.id}/teams`);
+      navigate(`/admin/seasons/${res.data.id}/teams`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create edition');
     } finally {
@@ -47,17 +47,17 @@ export default function NewEdition() {
     }
   };
 
-  if (!tournament) return <div className="text-center py-12 text-slate-400">Loading...</div>;
+  if (!competition) return <div className="text-center py-12 text-slate-400">Loading...</div>;
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4" data-testid="new-edition-page">
-      <h1 className="text-2xl font-bold text-white mb-2">New Edition</h1>
-      <p className="text-slate-400 mb-6">For {tournament.name}</p>
+      <h1 className="text-2xl font-bold text-white mb-2">New Season</h1>
+      <p className="text-slate-400 mb-6">For {competition.name}</p>
       {error && <div className="bg-red-900/50 text-red-300 p-3 rounded mb-4">{error}</div>}
       <form onSubmit={handleSubmit} className="bg-slate-800 p-6 rounded-lg space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-slate-300 mb-1">Edition Name *</label>
+            <label className="block text-slate-300 mb-1">Season Name *</label>
             <input value={name} onChange={(e) => setName(e.target.value)} required
               className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
               data-testid="name-input" />
@@ -98,7 +98,7 @@ export default function NewEdition() {
         <div className="flex gap-3">
           <button type="submit" disabled={loading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded font-medium disabled:opacity-50"
-            data-testid="submit-btn">{loading ? 'Creating...' : 'Create Edition'}</button>
+            data-testid="submit-btn">{loading ? 'Creating...' : 'Create Season'}</button>
           <button type="button" onClick={() => navigate(-1)}
             className="bg-slate-600 hover:bg-slate-500 text-white px-6 py-2 rounded">Cancel</button>
         </div>

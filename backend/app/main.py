@@ -1,17 +1,35 @@
-"""FastAPI main application"""
+"""FastAPI main application - PitchBase Platform"""
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.settings import get_settings
-from app.routers import auth, organisers, tournaments, editions, teams, players, matches, match_events, public, groups, admin, uploads
+from app.routers import (
+    auth,
+    organizations,
+    competitions,
+    seasons,
+    clubs,
+    teams,
+    players,
+    matches,
+    match_events,
+    groups,
+    public,
+    admin,
+    uploads,
+)
 
 settings = get_settings()
 
-app = FastAPI(title="Football Tournament Platform", version="1.0.0")
-
-# Ensure uploads directory exists
 os.makedirs("uploads", exist_ok=True)
+
+app = FastAPI(
+    title="PitchBase Football Platform",
+    version="2.0.0",
+    description="Multi-tenant grassroots football platform for Southern Africa",
+)
+
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
@@ -23,9 +41,10 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
-app.include_router(organisers.router, prefix="/api")
-app.include_router(tournaments.router, prefix="/api")
-app.include_router(editions.router, prefix="/api")
+app.include_router(organizations.router, prefix="/api")
+app.include_router(competitions.router, prefix="/api")
+app.include_router(seasons.router, prefix="/api")
+app.include_router(clubs.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
 app.include_router(players.router, prefix="/api")
 app.include_router(matches.router, prefix="/api")
@@ -38,4 +57,8 @@ app.include_router(uploads.router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "platform": "PitchBase",
+        "version": "2.0.0",
+    }

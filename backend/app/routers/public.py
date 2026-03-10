@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, Integer
 from sqlalchemy.orm import selectinload
 from app.db import get_db
-from app.models import Tournament, Edition, Team, Match, Organiser, MatchEvent, MatchStatus, MatchStage, EventType, Player, Group, GroupTeam
+from app.models import Competition, Season, Team, Match, Organization, MatchEvent, MatchStatus, MatchStage, EventType, Player, Group, GroupTeam
 from app.schemas.public import (
     PublicTournamentResponse, PublicEditionResponse, PublicTeamResponse, PublicFixtureResponse,
     PublicMatchEventResponse, TopScorerResponse, DisciplineResponse
@@ -15,49 +15,47 @@ from app.schemas.public import (
 router = APIRouter(prefix="/public", tags=["public"])
 
 
-@router.get("/tournaments/search", response_model=list[PublicTournamentResponse])
-async def search_tournaments(q: Optional[str] = None, location: Optional[str] = None, age_group: Optional[str] = None, db: AsyncSession = Depends(get_db)):
-    query = select(Tournament, Organiser.name.label("org_name"), Organiser.location.label("org_loc")).join(Organiser).where(Tournament.deleted_at.is_(None), Organiser.deleted_at.is_(None))
+@router.get("/competitions/search", response_model=list[PublicTournamentResponse])
+async def search_competitions(q: Optional[str] = None, location: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    query = select(Competition, Organization.name.label("org_name"), Organization.location.label("org_loc")).join(Organization).where(Competition.deleted_at.is_(None), Organization.deleted_at.is_(None))
     if q:
         query = query.where(
-            Tournament.name.ilike(f"%{q}%") |
-            Organiser.name.ilike(f"%{q}%") |
-            Organiser.location.ilike(f"%{q}%")
+            Competition.name.ilike(f"%{q}%") |
+            Organization.name.ilike(f"%{q}%") |
+            Organization.location.ilike(f"%{q}%")
         )
     if location:
-        query = query.where(Organiser.location.ilike(f"%{location}%"))
-    if age_group:
-        query = query.where(Tournament.age_group == age_group)
+        query = query.where(Organization.location.ilike(f"%{location}%"))
     result = await db.execute(query.limit(50))
     rows = result.all()
     return [
         PublicTournamentResponse(
-            id=r.Tournament.id,
-            name=r.Tournament.name,
-            description=r.Tournament.description,
-            logo_url=r.Tournament.logo_url,
+            id=r.Competition.id,
+            name=r.Competition.name,
+            description=r.Competition.description,
+            logo_url=r.Competition.logo_url,
             organiser_name=r.org_name,
             organiser_location=r.org_loc,
-            age_group=r.Tournament.age_group,
+            age_group=None,
         )
         for r in rows
     ]
 
 
-@router.get("/editions/{edition_id}", response_model=PublicEditionResponse)
-async def get_public_edition(edition_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/seasons/{season_id}", response_model=PublicEditionResponse)
+async def get_public_season(season_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Edition, Tournament.name.label("t_name"), Tournament.logo_url.label("t_logo"))
-        .join(Tournament)
-        .where(Edition.id == edition_id, Edition.deleted_at.is_(None))
+        select(Season, Competition.name.label("t_name"), Competition.logo_url.label("t_logo"))
+        .join(Competition)
+        .where(Season.id == season_id, Season.deleted_at.is_(None))
     )
     row = result.first()
     if not row:
-        raise HTTPException(status_code=404, detail="Edition not found")
-    e = row.Edition
+        raise HTTPException(status_code=404, detail="Season not found")
+    e = row.Season
     return PublicEditionResponse(
         id=e.id,
-        tournament_id=e.tournament_id,
+        tournament_id=e.competition_id,
         tournament_name=row.t_name,
         tournament_logo_url=row.t_logo,
         name=e.name,
@@ -70,16 +68,16 @@ async def get_public_edition(edition_id: UUID, db: AsyncSession = Depends(get_db
     )
 
 
-@router.get("/editions/{edition_id}/teams", response_model=list[PublicTeamResponse])
-async def get_public_teams(edition_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Team).where(Team.edition_id == edition_id, Team.deleted_at.is_(None)))
+@router.get("/seasons/{season_id}/teams", response_model=list[PublicTeamResponse])
+async def get_public_teams(season_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Team).where(Team.season_id == season_id, Team.deleted_at.is_(None)))
     return result.scalars().all()
 
 
-@router.get("/editions/{edition_id}/fixtures", response_model=list[PublicFixtureResponse])
-async def get_public_fixtures(edition_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/seasons/{season_id}/fixtures", response_model=list[PublicFixtureResponse])
+async def get_public_fixtures(season_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Match).where(Match.edition_id == edition_id, Match.deleted_at.is_(None)).order_by(Match.kickoff_datetime.asc().nullslast())
+        select(Match).where(Match.season_id == season_id, Match.deleted_at.is_(None)).order_by(Match.kickoff_datetime.asc().nullslast())
     )
     matches = result.scalars().all()
     team_ids = {m.home_team_id for m in matches} | {m.away_team_id for m in matches}
@@ -146,28 +144,28 @@ async def get_match_events(match_id: UUID, db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.get("/editions/{edition_id}/topscorers", response_model=list[TopScorerResponse])
-async def get_top_scorers(edition_id: UUID, limit: int = 50, db: AsyncSession = Depends(get_db)):
+@router.get("/seasons/{season_id}/topscorers", response_model=list[TopScorerResponse])
+async def get_top_scorers(season_id: UUID, limit: int = 50, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(
             MatchEvent.player_id,
             Player.name.label("player_name"),
-            Player.team_id,
+            MatchEvent.team_id,
             Team.name.label("team_name"),
             func.count(MatchEvent.id).label("goals"),
         )
         .join(Match, MatchEvent.match_id == Match.id)
         .join(Player, MatchEvent.player_id == Player.id)
-        .join(Team, Player.team_id == Team.id)
+        .join(Team, MatchEvent.team_id == Team.id)
         .where(
-            Match.edition_id == edition_id,
+            Match.season_id == season_id,
             Match.status == MatchStatus.COMPLETED,
             MatchEvent.event_type.in_([EventType.GOAL, EventType.PENALTY_SCORED]),
             MatchEvent.player_id.isnot(None),
             MatchEvent.deleted_at.is_(None),
             Match.deleted_at.is_(None),
         )
-        .group_by(MatchEvent.player_id, Player.name, Player.team_id, Team.name)
+        .group_by(MatchEvent.player_id, Player.name, MatchEvent.team_id, Team.name)
         .order_by(func.count(MatchEvent.id).desc(), Player.name.asc())
         .limit(limit)
     )
@@ -183,28 +181,28 @@ async def get_top_scorers(edition_id: UUID, limit: int = 50, db: AsyncSession = 
     ]
 
 
-@router.get("/editions/{edition_id}/discipline", response_model=list[DisciplineResponse])
-async def get_discipline(edition_id: UUID, limit: int = 50, db: AsyncSession = Depends(get_db)):
+@router.get("/seasons/{season_id}/discipline", response_model=list[DisciplineResponse])
+async def get_discipline(season_id: UUID, limit: int = 50, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(
             MatchEvent.player_id,
             Player.name.label("player_name"),
-            Player.team_id,
+            MatchEvent.team_id,
             Team.name.label("team_name"),
             func.sum(func.cast(MatchEvent.event_type == EventType.YELLOW_CARD, Integer)).label("yellow_cards"),
             func.sum(func.cast(MatchEvent.event_type == EventType.RED_CARD, Integer)).label("red_cards"),
         )
         .join(Match, MatchEvent.match_id == Match.id)
         .join(Player, MatchEvent.player_id == Player.id)
-        .join(Team, Player.team_id == Team.id)
+        .join(Team, MatchEvent.team_id == Team.id)
         .where(
-            Match.edition_id == edition_id,
+            Match.season_id == season_id,
             MatchEvent.event_type.in_([EventType.YELLOW_CARD, EventType.RED_CARD]),
             MatchEvent.player_id.isnot(None),
             MatchEvent.deleted_at.is_(None),
             Match.deleted_at.is_(None),
         )
-        .group_by(MatchEvent.player_id, Player.name, Player.team_id, Team.name)
+        .group_by(MatchEvent.player_id, Player.name, MatchEvent.team_id, Team.name)
     )
     rows = result.all()
     data = [
@@ -228,7 +226,7 @@ async def get_public_players(team_id: UUID, db: AsyncSession = Depends(get_db)):
     team_result = await db.execute(select(Team).where(Team.id == team_id, Team.deleted_at.is_(None)))
     if not team_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Team not found")
-    result = await db.execute(select(Player).where(Player.team_id == team_id, Player.deleted_at.is_(None)))
+    result = await db.execute(select(Player).where(Player.club_id == team_id, Player.deleted_at.is_(None)))
     players = result.scalars().all()
     return [
         {
@@ -241,21 +239,21 @@ async def get_public_players(team_id: UUID, db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.get("/tournaments/{tournament_id}")
-async def get_public_tournament(tournament_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/competitions/{competition_id}")
+async def get_public_competition(competition_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Tournament, Organiser.name.label("org_name"), Organiser.location.label("org_loc"))
-        .join(Organiser)
-        .where(Tournament.id == tournament_id, Tournament.deleted_at.is_(None))
+        select(Competition, Organization.name.label("org_name"), Organization.location.label("org_loc"))
+        .join(Organization)
+        .where(Competition.id == competition_id, Competition.deleted_at.is_(None))
     )
     row = result.first()
     if not row:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    t = row.Tournament
-    editions_result = await db.execute(
-        select(Edition).where(Edition.tournament_id == tournament_id, Edition.deleted_at.is_(None)).order_by(Edition.year.desc())
+        raise HTTPException(status_code=404, detail="Competition not found")
+    t = row.Competition
+    seasons_result = await db.execute(
+        select(Season).where(Season.competition_id == competition_id, Season.deleted_at.is_(None)).order_by(Season.year.desc())
     )
-    editions = editions_result.scalars().all()
+    seasons = seasons_result.scalars().all()
     return {
         "id": str(t.id),
         "name": t.name,
@@ -264,8 +262,8 @@ async def get_public_tournament(tournament_id: UUID, db: AsyncSession = Depends(
         "organiser_name": row.org_name,
         "organiser_location": row.org_loc,
         "editions": [
-            {"id": str(e.id), "name": e.name, "year": e.year, "status": e.status.value}
-            for e in editions
+            {"id": str(s.id), "name": s.name, "year": s.year, "status": s.status.value}
+            for s in seasons
         ],
     }
 
@@ -280,7 +278,7 @@ async def get_public_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
     teams = {t.id: t for t in teams_result.scalars().all()}
     return {
         "id": str(m.id),
-        "edition_id": str(m.edition_id),
+        "season_id": str(m.season_id),
         "stage": m.stage.value,
         "matchday": m.matchday,
         "kickoff_datetime": m.kickoff_datetime.isoformat() if m.kickoff_datetime else None,
@@ -297,11 +295,13 @@ async def get_public_match(match_id: UUID, db: AsyncSession = Depends(get_db)):
         "away_penalties": m.away_penalties,
         "status": m.status.value,
     }
-@router.get("/editions/{edition_id}/standings")
-async def get_standings(edition_id: UUID, db: AsyncSession = Depends(get_db)):
-    # Load all groups for this edition
+
+
+@router.get("/seasons/{season_id}/standings")
+async def get_standings(season_id: UUID, db: AsyncSession = Depends(get_db)):
+    # Load all groups for this season
     groups_result = await db.execute(
-        select(Group).where(Group.edition_id == edition_id, Group.deleted_at.is_(None)).order_by(Group.name)
+        select(Group).where(Group.season_id == season_id, Group.deleted_at.is_(None)).order_by(Group.name)
     )
     groups = groups_result.scalars().all()
     if not groups:
@@ -322,7 +322,7 @@ async def get_standings(edition_id: UUID, db: AsyncSession = Depends(get_db)):
     # Load completed group matches
     matches_result = await db.execute(
         select(Match).where(
-            Match.edition_id == edition_id,
+            Match.season_id == season_id,
             Match.stage == MatchStage.GROUP,
             Match.status == MatchStatus.COMPLETED,
             Match.deleted_at.is_(None),

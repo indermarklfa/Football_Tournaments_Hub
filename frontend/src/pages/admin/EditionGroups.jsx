@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEdition, getTeams, getGroups, createGroup, deleteGroup, addTeamToGroup, removeTeamFromGroup } from '../../lib/api';
+import { getSeason, getTeams, getGroups, createGroup, deleteGroup, addTeamToGroup, removeTeamFromGroup } from '../../lib/api';
 
 export default function EditionGroups() {
   const { id } = useParams();
-  const [edition, setEdition] = useState(null);
+  const [season, setSeason] = useState(null);
   const [teams, setTeams] = useState([]);
   const [groups, setGroups] = useState([]);
   const [groupTeams, setGroupTeams] = useState({});
@@ -17,9 +17,9 @@ export default function EditionGroups() {
   const loadData = async () => {
     try {
       const [edRes, teamsRes, groupsRes] = await Promise.all([
-        getEdition(id), getTeams(id), getGroups(id)
+        getSeason(id), getTeams(id), getGroups(id)
       ]);
-      setEdition(edRes.data);
+      setSeason(edRes.data);
       setTeams(teamsRes.data);
       setGroups(groupsRes.data);
       // Build groupTeams map: { groupId: [teamId, ...] }
@@ -75,8 +75,8 @@ export default function EditionGroups() {
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="mb-6">
-        <Link to={`/admin/editions/${id}/teams`} className="text-emerald-400 text-sm hover:underline">← Back to Teams</Link>
-        <h1 className="text-2xl font-bold text-white mt-2">{edition?.name} — Groups</h1>
+        <Link to={`/admin/seasons/${id}/teams`} className="text-emerald-400 text-sm hover:underline">← Back to Teams</Link>
+        <h1 className="text-2xl font-bold text-white mt-2">{season?.name} — Groups</h1>
         <p className="text-slate-400 text-sm mt-1">{teams.length} teams · {groups.length} groups</p>
       </div>
 

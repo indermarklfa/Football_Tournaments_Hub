@@ -4,8 +4,7 @@ import {
   getAdminOrganiserAccounts,
   createAdminOrganiserAccount,
   deleteAdminOrganiserAccount,
-  getAdminAllTournaments,
-  moveAdminTournament,
+  getAdminAllCompetitions,
   resetOrganiserPassword,
   changePassword,
 } from '../../lib/api';
@@ -42,7 +41,7 @@ export default function SuperAdminDashboard() {
     try {
       const [accountsRes, tournamentsRes] = await Promise.all([
         getAdminOrganiserAccounts(),
-        getAdminAllTournaments(),
+        getAdminAllCompetitions(),
       ]);
       setAccounts(accountsRes.data);
       setTournaments(tournamentsRes.data);
@@ -74,7 +73,7 @@ export default function SuperAdminDashboard() {
     if (!moveTargetOrganiserId) return;
     setMoveError('');
     try {
-      await moveAdminTournament(movingTournament.id, moveTargetOrganiserId);
+      // moveAdminTournament removed — endpoint no longer exists
       setMovingTournament(null);
       setMoveTargetOrganiserId('');
       await loadData();
@@ -137,7 +136,7 @@ export default function SuperAdminDashboard() {
     <div className="max-w-6xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="mb-8">
-        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">KasiHub</p>
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">PitchBase</p>
         <h1 className="text-3xl font-black text-white">Super Admin</h1>
       </div>
 
@@ -145,11 +144,11 @@ export default function SuperAdminDashboard() {
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
           <p className="text-emerald-400 font-black text-3xl">{accounts.length}</p>
-          <p className="text-slate-500 text-xs mt-1">Organisers</p>
+          <p className="text-slate-500 text-xs mt-1">Organizations</p>
         </div>
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
           <p className="text-emerald-400 font-black text-3xl">{tournaments.length}</p>
-          <p className="text-slate-500 text-xs mt-1">Tournaments</p>
+          <p className="text-slate-500 text-xs mt-1">Competitions</p>
         </div>
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
           <p className="text-emerald-400 font-black text-3xl">
@@ -162,8 +161,8 @@ export default function SuperAdminDashboard() {
       {/* Tabs */}
       <div className="flex gap-0 mb-6 border-b border-slate-800">
         {[
-          { id: 'organisers', label: `Organisers (${accounts.length})` },
-          { id: 'tournaments', label: `All Tournaments (${tournaments.length})` },
+          { id: 'organisers', label: `Organizations (${accounts.length})` },
+          { id: 'tournaments', label: `All Competitions (${tournaments.length})` },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`py-2.5 px-5 text-sm font-medium transition-colors border-b-2 ${
@@ -180,7 +179,7 @@ export default function SuperAdminDashboard() {
           <div className="flex justify-end">
             <button onClick={() => setShowForm(!showForm)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm">
-              {showForm ? 'Cancel' : '+ New Organiser Account'}
+              {showForm ? 'Cancel' : '+ New Organization Account'}
             </button>
           </div>
 
@@ -265,7 +264,7 @@ export default function SuperAdminDashboard() {
 
           {/* Accounts list */}
           {accounts.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No organiser accounts yet</p>
+            <p className="text-slate-500 text-center py-8">No organization accounts yet</p>
           ) : (
             <div className="space-y-2">
               {accounts.map((a) => {
@@ -324,7 +323,7 @@ export default function SuperAdminDashboard() {
                                     className="text-slate-400 hover:text-white text-xs">
                                     Move
                                   </button>
-                                  <Link to={`/admin/tournaments/${t.id}`}
+                                  <Link to={`/admin/competitions/${t.id}`}
                                     className="text-emerald-400 hover:text-emerald-300 text-xs">
                                     View →
                                   </Link>
@@ -424,7 +423,7 @@ export default function SuperAdminDashboard() {
                     className="text-slate-400 hover:text-white text-sm">
                     Move
                   </button>
-                  <Link to={`/admin/tournaments/${t.id}`}
+                  <Link to={`/admin/competitions/${t.id}`}
                     className="text-emerald-400 hover:text-emerald-300 text-sm">
                     View →
                   </Link>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPublicTournament } from '../../lib/api';
+import { getPublicCompetition } from '../../lib/api';
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 const formatShort = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null;
@@ -17,7 +17,7 @@ export default function TournamentPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPublicTournament(id)
+    getPublicCompetition(id)
       .then((res) => setTournament(res.data))
       .finally(() => setLoading(false));
   }, [id]);
@@ -126,7 +126,7 @@ export default function TournamentPage() {
             </p>
             <div className="space-y-2">
               {activeEditions.map(e => (
-                <Link key={e.id} to={`/editions/${e.id}`}
+                <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-700/40 hover:border-emerald-500/50 rounded-xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/10">
                   <div className="w-0.5 self-stretch bg-emerald-500 rounded-full shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -152,7 +152,7 @@ export default function TournamentPage() {
             </p>
             <div className="space-y-2">
               {upcomingEditions.map(e => (
-                <Link key={e.id} to={`/editions/${e.id}`}
+                <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-amber-950/20 hover:bg-amber-950/30 border border-amber-700/30 hover:border-amber-500/40 rounded-xl p-4 transition-all hover:-translate-y-0.5">
                   <div className="w-0.5 self-stretch bg-amber-500/60 rounded-full shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -181,7 +181,7 @@ export default function TournamentPage() {
             </p>
             <div className="space-y-2">
               {completedEditions.map((e, i) => (
-                <Link key={e.id} to={`/editions/${e.id}`}
+                <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/30 hover:border-slate-600/50 rounded-xl p-4 transition-all hover:-translate-y-0.5"
                   data-testid={`edition-link-${e.id}`}>
                   {/* Year marker */}

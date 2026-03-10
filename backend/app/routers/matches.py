@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, Organiser, Tournament, Edition, Match, MatchStage, MatchStatus, Group, GroupTeam
+from app.models import User, Organization, Competition, Season, Match, MatchStage, MatchStatus, Group, GroupTeam
 from app.deps import get_current_user
 from app.schemas.match import MatchCreate, MatchUpdate, MatchResponse
 from pydantic import BaseModel
@@ -16,19 +16,19 @@ from itertools import combinations
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
-async def verify_edition_ownership(db: AsyncSession, edition_id: UUID, user: User):
+async def verify_edition_ownership(db: AsyncSession, season_id: UUID, user: User):
     if user.role.value == 'admin':
         return
     result = await db.execute(
-        select(Edition).join(Tournament).join(Organiser).where(Edition.id == edition_id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
+        select(Season).join(Competition).join(Organization).where(Season.id == season_id, Organization.created_by_user_id == user.id, Season.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Edition not owned by user")
-    
+        raise HTTPException(status_code=403, detail="Season not owned by user")
+
 
 async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User) -> Match:
     result = await db.execute(
-        select(Match).join(Edition).join(Tournament).join(Organiser).where(Match.id == match_id, Organiser.owner_user_id == user.id, Match.deleted_at.is_(None))
+        select(Match).join(Season).join(Competition).join(Organization).where(Match.id == match_id, Organization.created_by_user_id == user.id, Match.deleted_at.is_(None))
     )
     m = result.scalar_one_or_none()
     if not m:
@@ -38,7 +38,7 @@ async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User)
 
 @router.post("", response_model=MatchResponse, status_code=status.HTTP_201_CREATED)
 async def create_match(req: MatchCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await verify_edition_ownership(db, req.edition_id, user)
+    await verify_edition_ownership(db, req.season_id, user)
     data = req.model_dump()
     data["stage"] = MatchStage(data["stage"])
     m = Match(**data)
@@ -49,9 +49,9 @@ async def create_match(req: MatchCreate, db: AsyncSession = Depends(get_db), use
 
 
 @router.get("", response_model=list[MatchResponse])
-async def list_matches(edition_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await verify_edition_ownership(db, edition_id, user)
-    result = await db.execute(select(Match).where(Match.edition_id == edition_id, Match.deleted_at.is_(None)))
+async def list_matches(season_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    await verify_edition_ownership(db, season_id, user)
+    result = await db.execute(select(Match).where(Match.season_id == season_id, Match.deleted_at.is_(None)))
     return result.scalars().all()
 
 
@@ -80,7 +80,7 @@ async def delete_match(id: UUID, db: AsyncSession = Depends(get_db), user: User 
     return m
 
 class GenerateFixturesRequest(BaseModel):
-    edition_id: UUID
+    season_id: UUID
     venue: Optional[str] = None
 
 @router.post("/generate-group-fixtures", status_code=201)
@@ -89,31 +89,31 @@ async def generate_group_fixtures(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    """Generate round-robin group fixtures for all groups in an edition"""
-    await verify_edition_ownership(db, req.edition_id, user)
+    """Generate round-robin group fixtures for all groups in a season"""
+    await verify_edition_ownership(db, req.season_id, user)
 
-    # Get all groups for this edition
+    # Get all groups for this season
     groups_result = await db.execute(
         select(Group).where(
-            Group.edition_id == req.edition_id,
+            Group.season_id == req.season_id,
             Group.deleted_at.is_(None)
         )
     )
     groups = groups_result.scalars().all()
 
     if not groups:
-        raise HTTPException(status_code=400, detail="No groups found for this edition")
+        raise HTTPException(status_code=400, detail="No groups found for this season")
 
     # Check no group fixtures already exist
     existing = await db.execute(
         select(Match).where(
-            Match.edition_id == req.edition_id,
+            Match.season_id == req.season_id,
             Match.stage == MatchStage.GROUP,
             Match.deleted_at.is_(None)
         )
     )
     if existing.scalars().first():
-        raise HTTPException(status_code=400, detail="Group fixtures already exist for this edition")
+        raise HTTPException(status_code=400, detail="Group fixtures already exist for this season")
 
     total_created = 0
 
@@ -158,7 +158,7 @@ async def generate_group_fixtures(
                     home_id, away_id = away_id, home_id
 
                 match = Match(
-                    edition_id=req.edition_id,
+                    season_id=req.season_id,
                     group_id=group.id,
                     stage=MatchStage.GROUP,
                     matchday=matchday,
@@ -202,9 +202,9 @@ async def bulk_update_matches(
     updated = 0
     for item in req.matches:
         result = await db.execute(
-            select(Match).join(Edition).join(Tournament).join(Organiser).where(
+            select(Match).join(Season).join(Competition).join(Organization).where(
                 Match.id == item.id,
-                Organiser.owner_user_id == user.id,
+                Organization.created_by_user_id == user.id,
                 Match.deleted_at.is_(None)
             )
         )

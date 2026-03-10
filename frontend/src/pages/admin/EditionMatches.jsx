@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEdition, getTeams, getAliveTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch, generateGroupFixtures, bulkUpdateMatches } from '../../lib/api';
+import { getSeason, getTeams, getAliveTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch, generateGroupFixtures, bulkUpdateMatches } from '../../lib/api';
 
 const STAGES = ['group', 'round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
 const STATUSES = ['scheduled', 'live', 'completed', 'postponed', 'cancelled'];
 
 export default function EditionMatches() {
   const { id } = useParams();
-  const [edition, setEdition] = useState(null);
+  const [season, setSeason] = useState(null);
   const [teams, setTeams] = useState([]);
   const [groups, setGroups] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -20,7 +20,7 @@ export default function EditionMatches() {
     groupId: '', kickoff: '', venue: '', status: 'scheduled'
   });
   const defaultStage = () => {
-    if (edition?.format === 'knockout') return 'round_of_16';
+    if (season?.format === 'knockout') return 'round_of_16';
     return 'group';
   };
 
@@ -39,9 +39,9 @@ export default function EditionMatches() {
 
   const loadData = async () => {
     const [edRes, teamsRes, matchesRes, groupsRes] = await Promise.all([
-      getEdition(id), getTeams(id), getMatches(id), getGroups(id)
+      getSeason(id), getTeams(id), getMatches(id), getGroups(id)
     ]);
-    setEdition(edRes.data);
+    setSeason(edRes.data);
     setTeams(teamsRes.data);
     setMatches(matchesRes.data);
     setGroups(groupsRes.data);
@@ -53,7 +53,7 @@ export default function EditionMatches() {
     setGenerating(true);
     setGenerateError('');
     try {
-      const res = await generateGroupFixtures({ edition_id: id, venue: edition?.venue || null });
+      const res = await generateGroupFixtures({ season_id: id, venue: season?.venue || null });
       await loadData();
       alert(`✓ Created ${res.data.created} fixtures across ${res.data.groups} groups`);
     } catch (err) {
@@ -96,7 +96,7 @@ export default function EditionMatches() {
   const handleCreate = async (e) => {
     e.preventDefault();
     await createMatch({
-      edition_id: id,
+      season_id: id,
       home_team_id: form.homeTeamId,
       away_team_id: form.awayTeamId,
       stage: form.stage,
@@ -156,9 +156,9 @@ export default function EditionMatches() {
   const filteredMatches = filter === 'all' ? matches : matches.filter(m => m.status === filter);
 
   // Stages available depend on format
-  const availableStages = edition?.format === 'knockout'
+  const availableStages = season?.format === 'knockout'
     ? STAGES.filter(s => s !== 'group')
-    : edition?.format === 'league'
+    : season?.format === 'league'
     ? ['group']  // league uses group stage matchdays only
     : STAGES;    // groups_knockout gets all stages
 
@@ -166,7 +166,7 @@ export default function EditionMatches() {
   const showGroupSelect = (stage) => 
     stage === 'group' && 
     groups.length > 0 && 
-    ['groups_knockout', 'league'].includes(edition?.format);
+    ['groups_knockout', 'league'].includes(season?.format);
 
   // Teams filtered to only those in the selected group
   const teamsForGroup = (groupId) => {
@@ -180,8 +180,8 @@ export default function EditionMatches() {
     <div className="max-w-6xl mx-auto py-8 px-4" data-testid="edition-matches-page">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">{edition?.name} - Matches</h1>
-          <Link to={`/admin/editions/${id}/teams`} className="text-emerald-400 text-sm hover:underline">← Back to Teams</Link>
+          <h1 className="text-2xl font-bold text-white">{season?.name} - Matches</h1>
+          <Link to={`/admin/seasons/${id}/teams`} className="text-emerald-400 text-sm hover:underline">← Back to Teams</Link>
         </div>
         <button onClick={async () => {
           const next = !showForm;
@@ -189,7 +189,7 @@ export default function EditionMatches() {
           if (next) {
             const res = await getAliveTeams(id);
             setAliveTeams(res.data);
-            setForm(f => ({ ...f, venue: edition?.venue || '', stage: defaultStage() }));
+            setForm(f => ({ ...f, venue: season?.venue || '', stage: defaultStage() }));
           }
         }}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-medium"
@@ -197,10 +197,10 @@ export default function EditionMatches() {
       </div>
 
       {/* Groups warning */}
-      {edition?.format === 'groups_knockout' && groups.length === 0 && (
+      {season?.format === 'groups_knockout' && groups.length === 0 && (
         <div className="bg-amber-900/30 border border-amber-700 text-amber-300 p-4 rounded-lg mb-6 flex items-center justify-between">
           <span className="text-sm">⚠ This is a Groups + Knockout edition but no groups have been set up yet.</span>
-          <Link to={`/admin/editions/${id}/groups`}
+          <Link to={`/admin/seasons/${id}/groups`}
             className="bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm ml-4 whitespace-nowrap">
             Set Up Groups →
           </Link>
@@ -209,7 +209,7 @@ export default function EditionMatches() {
 
       
       {/* Generate fixtures button — shown when groups exist and no group matches yet */}
-      {['groups_knockout', 'league'].includes(edition?.format) && groups.length > 0 && !matches.some(m => m.stage === 'group') && (
+      {['groups_knockout', 'league'].includes(season?.format) && groups.length > 0 && !matches.some(m => m.stage === 'group') && (
         <div className="bg-slate-800 border border-slate-700 p-4 rounded-lg mb-6 flex items-center justify-between">
           <div>
             <p className="text-white text-sm font-medium">Auto-generate group fixtures</p>
@@ -228,7 +228,7 @@ export default function EditionMatches() {
       )}
 
       {/* Schedule button — shown when group matches exist */}
-      {['groups_knockout', 'league'].includes(edition?.format) && matches.some(m => m.stage === 'group') && (
+      {['groups_knockout', 'league'].includes(season?.format) && matches.some(m => m.stage === 'group') && (
         <div className="flex justify-end mb-4">
           <button onClick={openScheduler}
             className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm">
@@ -417,8 +417,8 @@ export default function EditionMatches() {
             <div>
               <label className="block text-slate-300 mb-1">Kickoff</label>
               <input type="datetime-local" value={form.kickoff} onChange={(e) => setForm({ ...form, kickoff: e.target.value })}
-                min={edition?.start_date ? `${edition.start_date}T00:00` : undefined}
-                max={edition?.end_date ? `${edition.end_date}T23:59` : undefined}
+                min={season?.start_date ? `${season.start_date}T00:00` : undefined}
+                max={season?.end_date ? `${season.end_date}T23:59` : undefined}
                 className="w-full bg-slate-700 text-white px-4 py-2 rounded" />
             </div>
             <div>
@@ -595,8 +595,8 @@ export default function EditionMatches() {
                               <label className="block text-slate-400 text-xs mb-1">Kickoff</label>
                               <input type="datetime-local" value={editForm.kickoff}
                                 onChange={(e) => setEditForm({ ...editForm, kickoff: e.target.value })}
-                                min={edition?.start_date ? `${edition.start_date}T00:00` : undefined}
-                                max={edition?.end_date ? `${edition.end_date}T23:59` : undefined}
+                                min={season?.start_date ? `${season.start_date}T00:00` : undefined}
+                                max={season?.end_date ? `${season.end_date}T23:59` : undefined}
                                 className="w-full bg-slate-700 text-white px-3 py-1.5 rounded text-sm" />
                             </div>
                             <div>

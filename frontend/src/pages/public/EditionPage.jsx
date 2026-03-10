@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPublicEdition, getPublicFixtures, getPublicTeams, getPublicTopScorers, getPublicDiscipline, getPublicPlayers, getPublicStandings } from '../../lib/api';
+import { getPublicSeason, getPublicFixtures, getPublicTeams, getPublicTopScorers, getPublicDiscipline, getPublicPlayers, getPublicStandings } from '../../lib/api';
 
 export default function EditionPage() {
   const { id } = useParams();
@@ -19,7 +19,7 @@ export default function EditionPage() {
 
   useEffect(() => {
     Promise.all([
-      getPublicEdition(id),
+      getPublicSeason(id),
       getPublicFixtures(id),
       getPublicTeams(id),
       getPublicTopScorers(id),
@@ -80,7 +80,7 @@ export default function EditionPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-emerald-500/8 rounded-full blur-3xl" />
 
         <div className="relative max-w-5xl mx-auto px-4 pt-5 pb-8">
-          <Link to={`/tournaments/${edition.tournament_id}`}
+          <Link to={`/competitions/${edition.tournament_id}`}
             className="text-slate-500 hover:text-emerald-400 text-sm transition-colors">
             ← Back to {edition.tournament_name}
           </Link>

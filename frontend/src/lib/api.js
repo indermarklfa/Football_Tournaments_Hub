@@ -32,29 +32,37 @@ api.interceptors.response.use(
 export const register = (email, password) => api.post('/api/auth/register', { email, password });
 export const login = (email, password) => api.post('/api/auth/login', { email, password });
 export const getMe = () => api.get('/api/auth/me');
+export const changePassword = (data) => api.post('/api/auth/change-password', data);
 
-// Organisers
-export const createOrganiser = (data) => api.post('/api/organisers', data);
-export const getOrganisers = () => api.get('/api/organisers');
-export const getOrganiser = (id) => api.get(`/api/organisers/${id}`);
-export const updateOrganiser = (id, data) => api.patch(`/api/organisers/${id}`, data);
+// Organizations (was: Organisers)
+export const createOrganization = (data) => api.post('/api/organizations', data);
+export const getOrganizations = () => api.get('/api/organizations');
+export const getOrganization = (id) => api.get(`/api/organizations/${id}`);
+export const updateOrganization = (id, data) => api.patch(`/api/organizations/${id}`, data);
 
-// Tournaments
-export const createTournament = (data) => api.post('/api/tournaments', data);
-export const getTournaments = (organiserId) => api.get(`/api/tournaments?organiser_id=${organiserId}`);
-export const getTournament = (id) => api.get(`/api/tournaments/${id}`);
-export const updateTournament = (id, data) => api.patch(`/api/tournaments/${id}`, data);
+// Competitions (was: Tournaments)
+export const createCompetition = (data) => api.post('/api/competitions', data);
+export const getCompetitions = (organizationId) => api.get(`/api/competitions?organization_id=${organizationId}`);
+export const getCompetition = (id) => api.get(`/api/competitions/${id}`);
+export const updateCompetition = (id, data) => api.patch(`/api/competitions/${id}`, data);
 
-// Editions
-export const createEdition = (data) => api.post('/api/editions', data);
-export const getEditions = (tournamentId) => api.get(`/api/editions?tournament_id=${tournamentId}`);
-export const getEdition = (id) => api.get(`/api/editions/${id}`);
-export const updateEdition = (id, data) => api.patch(`/api/editions/${id}`, data);
-export const getAliveTeams = (editionId) => api.get(`/api/editions/${editionId}/alive-teams`);
+// Seasons (was: Editions)
+export const createSeason = (data) => api.post('/api/seasons', data);
+export const getSeasons = (competitionId) => api.get(`/api/seasons?competition_id=${competitionId}`);
+export const getSeason = (id) => api.get(`/api/seasons/${id}`);
+export const updateSeason = (id, data) => api.patch(`/api/seasons/${id}`, data);
+export const getAliveTeams = (seasonId) => api.get(`/api/seasons/${seasonId}/alive-teams`);
+export const cloneSeason = (id, data) => api.post(`/api/seasons/${id}/clone`, data);
+
+// Clubs (new)
+export const createClub = (data) => api.post('/api/clubs', data);
+export const getClubs = (organizationId) => api.get(`/api/clubs?organization_id=${organizationId}`);
+export const getClub = (id) => api.get(`/api/clubs/${id}`);
+export const updateClub = (id, data) => api.patch(`/api/clubs/${id}`, data);
 
 // Teams
 export const createTeam = (data) => api.post('/api/teams', data);
-export const getTeams = (editionId) => api.get(`/api/teams?edition_id=${editionId}`);
+export const getTeams = (seasonId) => api.get(`/api/teams?season_id=${seasonId}`);
 export const updateTeam = (id, data) => api.patch(`/api/teams/${id}`, data);
 export const deleteTeam = (id) => api.post(`/api/teams/${id}/delete`);
 
@@ -65,18 +73,19 @@ export const updatePlayer = (id, data) => api.patch(`/api/players/${id}`, data);
 export const deletePlayer = (id) => api.post(`/api/players/${id}/delete`);
 
 // Groups
-export const createGroup = (editionId, name) => api.post(`/api/groups?edition_id=${editionId}&name=${encodeURIComponent(name)}`);
-export const getGroups = (editionId) => api.get(`/api/groups?edition_id=${editionId}`);
+export const createGroup = (seasonId, name) => api.post(`/api/groups?season_id=${seasonId}&name=${encodeURIComponent(name)}`);
+export const getGroups = (seasonId) => api.get(`/api/groups?season_id=${seasonId}`);
 export const deleteGroup = (groupId) => api.delete(`/api/groups/${groupId}`);
 export const addTeamToGroup = (groupId, teamId) => api.post(`/api/groups/${groupId}/teams/${teamId}`);
 export const removeTeamFromGroup = (groupId, teamId) => api.delete(`/api/groups/${groupId}/teams/${teamId}`);
-export const getPublicStandings = (editionId) => api.get(`/api/public/editions/${editionId}/standings`);
 
 // Matches
 export const createMatch = (data) => api.post('/api/matches', data);
-export const getMatches = (editionId) => api.get(`/api/matches?edition_id=${editionId}`);
+export const getMatches = (seasonId) => api.get(`/api/matches?season_id=${seasonId}`);
 export const updateMatch = (id, data) => api.patch(`/api/matches/${id}`, data);
 export const deleteMatch = (id) => api.post(`/api/matches/${id}/delete`);
+export const generateGroupFixtures = (data) => api.post('/api/matches/generate-group-fixtures', data);
+export const bulkUpdateMatches = (data) => api.post('/api/matches/bulk-update', data);
 
 // Match Events
 export const createMatchEvent = (data) => api.post('/api/match-events', data);
@@ -85,19 +94,20 @@ export const updateMatchEvent = (id, data) => api.patch(`/api/match-events/${id}
 export const deleteMatchEvent = (id) => api.post(`/api/match-events/${id}/delete`);
 
 // Public
-export const searchTournaments = (q, age_group) => {
+export const searchCompetitions = (q, age_group) => {
   const params = new URLSearchParams();
   if (q) params.append('q', q);
   if (age_group) params.append('age_group', age_group);
   const qs = params.toString();
-  return api.get(`/api/public/tournaments/search${qs ? `?${qs}` : ''}`);
+  return api.get(`/api/public/competitions/search${qs ? `?${qs}` : ''}`);
 };
-export const getPublicTournament = (id) => api.get(`/api/public/tournaments/${id}`);
-export const getPublicEdition = (id) => api.get(`/api/public/editions/${id}`);
-export const getPublicFixtures = (editionId) => api.get(`/api/public/editions/${editionId}/fixtures`);
-export const getPublicTeams = (editionId) => api.get(`/api/public/editions/${editionId}/teams`);
-export const getPublicTopScorers = (editionId) => api.get(`/api/public/editions/${editionId}/topscorers`);
-export const getPublicDiscipline = (editionId) => api.get(`/api/public/editions/${editionId}/discipline`);
+export const getPublicCompetition = (id) => api.get(`/api/public/competitions/${id}`);
+export const getPublicSeason = (id) => api.get(`/api/public/seasons/${id}`);
+export const getPublicFixtures = (seasonId) => api.get(`/api/public/seasons/${seasonId}/fixtures`);
+export const getPublicTeams = (seasonId) => api.get(`/api/public/seasons/${seasonId}/teams`);
+export const getPublicTopScorers = (seasonId) => api.get(`/api/public/seasons/${seasonId}/topscorers`);
+export const getPublicDiscipline = (seasonId) => api.get(`/api/public/seasons/${seasonId}/discipline`);
+export const getPublicStandings = (seasonId) => api.get(`/api/public/seasons/${seasonId}/standings`);
 export const getPublicMatch = (id) => api.get(`/api/public/matches/${id}`);
 export const getPublicMatchEvents = (matchId) => api.get(`/api/public/matches/${matchId}/events`);
 export const getPublicPlayers = (teamId) => api.get(`/api/public/teams/${teamId}/players`);
@@ -106,18 +116,14 @@ export const getPublicPlayers = (teamId) => api.get(`/api/public/teams/${teamId}
 export const getAdminOrganiserAccounts = () => api.get('/api/admin/organiser-accounts');
 export const createAdminOrganiserAccount = (data) => api.post('/api/admin/organiser-accounts', data);
 export const deleteAdminOrganiserAccount = (userId) => api.delete(`/api/admin/organiser-accounts/${userId}`);
-export const getAdminAllTournaments = () => api.get('/api/admin/tournaments');
-export const moveAdminTournament = (tournamentId, organiserId) => api.patch(`/api/admin/tournaments/${tournamentId}/move`, { organiser_id: organiserId });
-export const changePassword = (data) => api.post('/api/auth/change-password', data);
+export const getAdminAllCompetitions = () => api.get('/api/admin/competitions');
 export const resetOrganiserPassword = (userId, newPassword) => api.post(`/api/admin/organiser-accounts/${userId}/reset-password`, { new_password: newPassword });
-export const generateGroupFixtures = (data) => api.post('/api/matches/generate-group-fixtures', data);
-export const bulkUpdateMatches = (data) => api.post('/api/matches/bulk-update', data);
-export const cloneEdition = (id, data) => api.post(`/api/editions/${id}/clone`, data);
 
+// Image Upload
 export const uploadImage = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/image`, {
+  const res = await fetch(`${API_URL}/api/uploads/image`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${localStorage.getItem('token')}`,

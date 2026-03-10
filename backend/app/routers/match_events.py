@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, Organiser, Tournament, Edition, Match, Team, Player, MatchEvent, EventType, MatchStatus
+from app.models import User, Organization, Competition, Season, Match, Team, Player, MatchEvent, EventType, MatchStatus
 from app.deps import get_current_user
 from app.schemas.match_event import MatchEventCreate, MatchEventUpdate, MatchEventOut
 
@@ -118,9 +118,9 @@ async def recalculate_shootout(db: AsyncSession, match: Match):
 
 async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User) -> Match:
     result = await db.execute(
-        select(Match).join(Edition).join(Tournament).join(Organiser).where(
+        select(Match).join(Season).join(Competition).join(Organization).where(
             Match.id == match_id,
-            Organiser.owner_user_id == user.id,
+            Organization.created_by_user_id == user.id,
             Match.deleted_at.is_(None)
         )
     )
@@ -137,10 +137,10 @@ async def validate_team_in_match(match: Match, team_id: UUID):
 
 async def validate_player_in_team(db: AsyncSession, player_id: UUID, team_id: UUID):
     result = await db.execute(
-        select(Player).where(Player.id == player_id, Player.team_id == team_id, Player.deleted_at.is_(None))
+        select(Player).where(Player.id == player_id, Player.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Player not in team")
+        raise HTTPException(status_code=400, detail="Player not found")
 
 
 @router.post("", response_model=MatchEventOut, status_code=201)
@@ -162,7 +162,7 @@ async def create_match_event(
         player_id=req.player_id,
         event_type=event_type,
         minute=req.minute,
-        additional_info=req.additional_info,
+        notes=getattr(req, 'notes', None),
     )
     db.add(event)
     await db.flush()
@@ -201,9 +201,9 @@ async def update_match_event(
     user: User = Depends(get_current_user)
 ):
     result = await db.execute(
-        select(MatchEvent).join(Match).join(Edition).join(Tournament).join(Organiser).where(
+        select(MatchEvent).join(Match).join(Season).join(Competition).join(Organization).where(
             MatchEvent.id == event_id,
-            Organiser.owner_user_id == user.id,
+            Organization.created_by_user_id == user.id,
             MatchEvent.deleted_at.is_(None)
         )
     )
@@ -237,9 +237,9 @@ async def delete_match_event(
     user: User = Depends(get_current_user)
 ):
     result = await db.execute(
-        select(MatchEvent).join(Match).join(Edition).join(Tournament).join(Organiser).where(
+        select(MatchEvent).join(Match).join(Season).join(Competition).join(Organization).where(
             MatchEvent.id == event_id,
-            Organiser.owner_user_id == user.id,
+            Organization.created_by_user_id == user.id,
             MatchEvent.deleted_at.is_(None)
         )
     )

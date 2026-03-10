@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getEdition, getTeams, createTeam, updateTeam, deleteTeam, getPlayers, createPlayer, updatePlayer, deletePlayer } from '../../lib/api';
+import { getSeason, getTeams, createTeam, updateTeam, deleteTeam, getPlayers, createPlayer, updatePlayer, deletePlayer } from '../../lib/api';
 import ImageUpload from '../../components/ImageUpload';
 
 const POSITIONS = [
@@ -12,7 +12,7 @@ const POSITIONS = [
 
 export default function EditionTeams() {
   const { id } = useParams();
-  const [edition, setEdition] = useState(null);
+  const [season, setSeason] = useState(null);
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -31,8 +31,8 @@ export default function EditionTeams() {
 
   const loadData = async () => {
     try {
-      const [edRes, teamsRes] = await Promise.all([getEdition(id), getTeams(id)]);
-      setEdition(edRes.data);
+      const [edRes, teamsRes] = await Promise.all([getSeason(id), getTeams(id)]);
+      setSeason(edRes.data);
       setTeams(teamsRes.data);
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ export default function EditionTeams() {
   const handleAddTeam = async (e) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
-    await createTeam({ edition_id: id, name: newTeamName, coach_name: newTeamCoach || null });
+    await createTeam({ season_id: id, name: newTeamName, coach_name: newTeamCoach || null });
     setNewTeamName('');
     setNewTeamCoach('');
     const res = await getTeams(id);
@@ -132,10 +132,10 @@ export default function EditionTeams() {
     <div className="max-w-6xl mx-auto py-8 px-4" data-testid="edition-teams-page">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">{edition?.name} - Teams</h1>
-          <Link to={`/admin/tournaments/${edition?.tournament_id}`} className="text-emerald-400 text-sm hover:underline">← Back to Tournament</Link>
-          <Link to={`/admin/editions/${id}/matches`} className="text-emerald-400 text-sm hover:underline ml-4">Go to Matches →</Link>
-          <Link to={`/admin/editions/${id}/groups`} className="text-emerald-400 text-sm hover:underline ml-4">Manage Groups →</Link>
+          <h1 className="text-2xl font-bold text-white">{season?.name} - Teams</h1>
+          <Link to={`/admin/competitions/${season?.competition_id}`} className="text-emerald-400 text-sm hover:underline">← Back to Competition</Link>
+          <Link to={`/admin/seasons/${id}/matches`} className="text-emerald-400 text-sm hover:underline ml-4">Go to Matches →</Link>
+          <Link to={`/admin/seasons/${id}/groups`} className="text-emerald-400 text-sm hover:underline ml-4">Manage Groups →</Link>
         </div>
       </div>
 

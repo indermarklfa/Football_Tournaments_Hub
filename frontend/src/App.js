@@ -34,8 +34,8 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
-              <Route path="/tournaments/:id" element={<TournamentPage />} />
-              <Route path="/editions/:id" element={<EditionPage />} />
+              <Route path="/competitions/:id" element={<TournamentPage />} />
+              <Route path="/seasons/:id" element={<EditionPage />} />
               <Route path="/matches/:id" element={<MatchPage />} />
 
               {/* Auth Routes */}
@@ -50,13 +50,13 @@ function App() {
               <Route path="/admin/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/admin/organiser" element={<ProtectedRoute><OrganiserDashboard /></ProtectedRoute>} />
               <Route path="/admin/super" element={<ProtectedRoute><SuperAdminDashboard /></ProtectedRoute>} />
-              <Route path="/admin/organisers/new" element={<ProtectedRoute><NewOrganiser /></ProtectedRoute>} />
-              <Route path="/admin/tournaments/new" element={<ProtectedRoute><NewTournament /></ProtectedRoute>} />
-              <Route path="/admin/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
-              <Route path="/admin/editions/new" element={<ProtectedRoute><NewEdition /></ProtectedRoute>} />
-              <Route path="/admin/editions/:id/teams" element={<ProtectedRoute><EditionTeams /></ProtectedRoute>} />
-              <Route path="/admin/editions/:id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
-              <Route path="/admin/editions/:id/groups" element={<ProtectedRoute><EditionGroups /></ProtectedRoute>} />
+              <Route path="/admin/organizations/new" element={<ProtectedRoute><NewOrganiser /></ProtectedRoute>} />
+              <Route path="/admin/competitions/new" element={<ProtectedRoute><NewTournament /></ProtectedRoute>} />
+              <Route path="/admin/competitions/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
+              <Route path="/admin/seasons/new" element={<ProtectedRoute><NewEdition /></ProtectedRoute>} />
+              <Route path="/admin/seasons/:id/teams" element={<ProtectedRoute><EditionTeams /></ProtectedRoute>} />
+              <Route path="/admin/seasons/:id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
+              <Route path="/admin/seasons/:id/groups" element={<ProtectedRoute><EditionGroups /></ProtectedRoute>} />
               <Route path="/admin/matches/:id/events" element={<ProtectedRoute><MatchEvents /></ProtectedRoute>} />
             </Routes>
           </main>

@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { searchTournaments } from '../../lib/api';
+import { searchCompetitions } from '../../lib/api';
 
 const AGE_GROUPS = ['U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'U21', 'Senior', 'Veterans'];
 
 export default function Home() {
   const [query, setQuery] = useState('');
-  const [ageGroupFilter, setAgeGroupFilter] = useState('');
   const [tournaments, setTournaments] = useState([]);
   const [allTournaments, setAllTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    searchTournaments('', '').then((res) => {
+    searchCompetitions('').then((res) => {
       setTournaments(res.data);
       setAllTournaments(res.data);
       setLoading(false);
@@ -22,10 +21,10 @@ export default function Home() {
     });
   }, []);
 
-  const doSearch = async (q, ag) => {
+  const doSearch = async (q) => {
     setLoading(true);
     try {
-      const res = await searchTournaments(q, ag);
+      const res = await searchCompetitions(q);
       setTournaments(res.data);
     } catch {
       setTournaments([]);
@@ -36,15 +35,15 @@ export default function Home() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    doSearch(query, ageGroupFilter);
+    doSearch(query);
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      doSearch(query, ageGroupFilter);
+      doSearch(query);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, ageGroupFilter]);
+  }, [query]);
 
   return (
     <div className="min-h-screen" data-testid="home-page">
@@ -96,23 +95,13 @@ export default function Home() {
           {/* Age group filters */}
           <div className="flex flex-wrap gap-2 justify-center">
             <button
-              onClick={() => { setAgeGroupFilter(''); doSearch(query, ''); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                ageGroupFilter === ''
-                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50'
-              }`}>
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
               All
             </button>
             {AGE_GROUPS.map(ag => (
               <button
                 key={ag}
-                onClick={() => { setAgeGroupFilter(ag); doSearch(query, ag); }}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  ageGroupFilter === ag
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50'
-                }`}>
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50">
                 {ag}
               </button>
             ))}
@@ -126,14 +115,14 @@ export default function Home() {
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-center gap-8">
             <div className="text-center">
               <p className="text-emerald-400 font-bold text-lg leading-none">{allTournaments.length}</p>
-              <p className="text-slate-500 text-xs mt-0.5">Tournaments</p>
+              <p className="text-slate-500 text-xs mt-0.5">Competitions</p>
             </div>
             <div className="w-px h-8 bg-slate-700" />
             <div className="text-center">
               <p className="text-emerald-400 font-bold text-lg leading-none">
                 {new Set(allTournaments.map(t => t.organiser_name).filter(Boolean)).size}
               </p>
-              <p className="text-slate-500 text-xs mt-0.5">Organisers</p>
+              <p className="text-slate-500 text-xs mt-0.5">Organizations</p>
             </div>
             <div className="w-px h-8 bg-slate-700" />
             <div className="text-center">
@@ -150,21 +139,20 @@ export default function Home() {
       <div className="max-w-3xl mx-auto px-4 py-6">
         {!loading && tournaments.length > 0 && (
           <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
-            {tournaments.length} Tournament{tournaments.length !== 1 ? 's' : ''}
-            {ageGroupFilter ? ` · ${ageGroupFilter}` : ''}
+            {tournaments.length} Competition{tournaments.length !== 1 ? 's' : ''}
           </p>
         )}
 
         {loading ? (
           <div className="text-center text-slate-500 py-12">Loading...</div>
         ) : tournaments.length === 0 ? (
-          <div className="text-center text-slate-500 py-12">No tournaments found</div>
+          <div className="text-center text-slate-500 py-12">No competitions found</div>
         ) : (
           <div className="space-y-3">
             {tournaments.map((t) => (
               <Link
                 key={t.id}
-                to={`/tournaments/${t.id}`}
+                to={`/competitions/${t.id}`}
                 className="group flex gap-4 items-center bg-slate-800/60 hover:bg-slate-800 border border-slate-700/40 hover:border-emerald-500/30 rounded-xl p-4 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/5 hover:-translate-y-0.5"
                 data-testid={`tournament-card-${t.id}`}>
 

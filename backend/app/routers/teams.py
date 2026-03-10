@@ -5,25 +5,25 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, Organiser, Tournament, Edition, Team
+from app.models import User, Organization, Competition, Season, Team
 from app.deps import get_current_user
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
 
-async def verify_edition_ownership(db: AsyncSession, edition_id: UUID, user: User):
+async def verify_edition_ownership(db: AsyncSession, season_id: UUID, user: User):
     if user.role.value == 'admin':
         return
     result = await db.execute(
-        select(Edition).join(Tournament).join(Organiser).where(Edition.id == edition_id, Organiser.owner_user_id == user.id, Edition.deleted_at.is_(None))
+        select(Season).join(Competition).join(Organization).where(Season.id == season_id, Organization.created_by_user_id == user.id, Season.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Edition not owned by user")
+        raise HTTPException(status_code=403, detail="Season not owned by user")
 
 async def get_team_with_ownership(db: AsyncSession, team_id: UUID, user: User) -> Team:
     result = await db.execute(
-        select(Team).join(Edition).join(Tournament).join(Organiser).where(Team.id == team_id, Organiser.owner_user_id == user.id, Team.deleted_at.is_(None))
+        select(Team).join(Season).join(Competition).join(Organization).where(Team.id == team_id, Organization.created_by_user_id == user.id, Team.deleted_at.is_(None))
     )
     team = result.scalar_one_or_none()
     if not team:
@@ -33,7 +33,7 @@ async def get_team_with_ownership(db: AsyncSession, team_id: UUID, user: User) -
 
 @router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
 async def create_team(req: TeamCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await verify_edition_ownership(db, req.edition_id, user)
+    await verify_edition_ownership(db, req.season_id, user)
     t = Team(**req.model_dump())
     db.add(t)
     await db.commit()
@@ -42,9 +42,9 @@ async def create_team(req: TeamCreate, db: AsyncSession = Depends(get_db), user:
 
 
 @router.get("", response_model=list[TeamResponse])
-async def list_teams(edition_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    await verify_edition_ownership(db, edition_id, user)
-    result = await db.execute(select(Team).where(Team.edition_id == edition_id, Team.deleted_at.is_(None)))
+async def list_teams(season_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    await verify_edition_ownership(db, season_id, user)
+    result = await db.execute(select(Team).where(Team.season_id == season_id, Team.deleted_at.is_(None)))
     return result.scalars().all()
 
 

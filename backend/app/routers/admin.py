@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, UserRole, Organiser, Tournament
+from app.models import User, UserRole, Organization, Competition
 from app.deps import get_current_user
 from app.security import hash_password
 from app.schemas.auth import UserResponse
-from app.schemas.organiser import OrganiserResponse
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime, timezone
@@ -60,7 +59,7 @@ async def create_organiser_account(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """Create a new organiser user + their organiser profile in one step"""
+    """Create a new organiser user + their organization profile in one step"""
     # Check email not taken
     existing = await db.execute(
         select(User).where(User.email == req.email, User.deleted_at.is_(None))
@@ -77,24 +76,24 @@ async def create_organiser_account(
     db.add(user)
     await db.flush()
 
-    # Create their organiser profile
-    organiser = Organiser(
-        owner_user_id=user.id,
+    # Create their organization profile
+    org = Organization(
+        created_by_user_id=user.id,
         name=req.organiser_name,
         location=req.organiser_location,
         description=req.organiser_description,
     )
-    db.add(organiser)
+    db.add(org)
     await db.commit()
     await db.refresh(user)
-    await db.refresh(organiser)
+    await db.refresh(org)
 
     return OrganiserUserResponse(
         user_id=user.id,
         email=user.email,
-        organiser_id=organiser.id,
-        organiser_name=organiser.name,
-        organiser_location=organiser.location,
+        organiser_id=org.id,
+        organiser_name=org.name,
+        organiser_location=org.location,
         created_at=user.created_at,
     )
 
@@ -104,10 +103,10 @@ async def list_organiser_accounts(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """List all organiser users with their organiser profile"""
+    """List all organiser users with their organization profile"""
     result = await db.execute(
-        select(User, Organiser)
-        .join(Organiser, Organiser.owner_user_id == User.id)
+        select(User, Organization)
+        .join(Organization, Organization.created_by_user_id == User.id)
         .where(User.deleted_at.is_(None), User.role == UserRole.ORGANISER)
         .order_by(User.created_at.desc())
     )
@@ -116,9 +115,9 @@ async def list_organiser_accounts(
         OrganiserUserResponse(
             user_id=row.User.id,
             email=row.User.email,
-            organiser_id=row.Organiser.id,
-            organiser_name=row.Organiser.name,
-            organiser_location=row.Organiser.location,
+            organiser_id=row.Organization.id,
+            organiser_name=row.Organization.name,
+            organiser_location=row.Organization.location,
             created_at=row.User.created_at,
         )
         for row in rows
@@ -144,57 +143,56 @@ async def delete_organiser_account(
     await db.commit()
 
 
-@router.get("/tournaments")
-async def list_all_tournaments(
+@router.get("/competitions")
+async def list_all_competitions(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """List all tournaments across all organisers"""
+    """List all competitions across all organizations"""
     result = await db.execute(
-        select(Tournament, Organiser.name.label("organiser_name"))
-        .join(Organiser)
-        .where(Tournament.deleted_at.is_(None))
-        .order_by(Organiser.name.asc(), Tournament.name.asc())
+        select(Competition, Organization.name.label("organiser_name"))
+        .join(Organization)
+        .where(Competition.deleted_at.is_(None))
+        .order_by(Organization.name.asc(), Competition.name.asc())
     )
     rows = result.all()
     return [
         {
-            "id": str(row.Tournament.id),
-            "name": row.Tournament.name,
-            "description": row.Tournament.description,
-            "age_group": row.Tournament.age_group,
+            "id": str(row.Competition.id),
+            "name": row.Competition.name,
+            "description": row.Competition.description,
             "organiser_name": row.organiser_name,
         }
         for row in rows
     ]
 
-@router.patch("/tournaments/{tournament_id}/move")
-async def move_tournament(
-    tournament_id: UUID,
+@router.patch("/competitions/{competition_id}/move")
+async def move_competition(
+    competition_id: UUID,
     data: dict,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """Move a tournament to a different organiser"""
+    """Move a competition to a different organization"""
     result = await db.execute(
-        select(Tournament).where(Tournament.id == tournament_id, Tournament.deleted_at.is_(None))
+        select(Competition).where(Competition.id == competition_id, Competition.deleted_at.is_(None))
     )
-    tournament = result.scalar_one_or_none()
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+    competition = result.scalar_one_or_none()
+    if not competition:
+        raise HTTPException(status_code=404, detail="Competition not found")
 
     new_organiser_id = data.get("organiser_id")
     if not new_organiser_id:
         raise HTTPException(status_code=400, detail="organiser_id required")
 
-    # Verify new organiser exists
+    # Verify new organization exists
     org_result = await db.execute(
-        select(Organiser).where(Organiser.id == UUID(new_organiser_id), Organiser.deleted_at.is_(None))
+        select(Organization).where(Organization.id == UUID(new_organiser_id), Organization.deleted_at.is_(None))
     )
     if not org_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Organiser not found")
+        raise HTTPException(status_code=404, detail="Organization not found")
 
-    tournament.organiser_id = UUID(new_organiser_id)
+    competition.organization_id = UUID(new_organiser_id)
     await db.commit()
     return {"success": True}
 

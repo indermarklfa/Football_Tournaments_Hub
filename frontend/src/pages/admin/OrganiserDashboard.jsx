@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getOrganisers, getTournaments, updateOrganiser, changePassword } from '../../lib/api';
+import { getOrganizations, getCompetitions, updateOrganization, changePassword } from '../../lib/api';
 
 export default function OrganiserDashboard() {
-  const [organiser, setOrganiser] = useState(null);
-  const [tournaments, setTournaments] = useState([]);
+  const [organization, setOrganization] = useState(null);
+  const [competitions, setCompetitions] = useState([]);
   const [editingOrg, setEditingOrg] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '', location: '' });
   const [loading, setLoading] = useState(true);
@@ -18,12 +18,12 @@ export default function OrganiserDashboard() {
 
   const loadData = async () => {
     try {
-      const orgRes = await getOrganisers();
+      const orgRes = await getOrganizations();
       const org = orgRes.data[0]; // Organiser only has one
-      setOrganiser(org);
+      setOrganization(org);
       if (org) {
-        const tourRes = await getTournaments(org.id);
-        setTournaments(tourRes.data);
+        const tourRes = await getCompetitions(org.id);
+        setCompetitions(tourRes.data);
       }
     } catch (err) {
       setError('Failed to load data');
@@ -35,15 +35,15 @@ export default function OrganiserDashboard() {
   const startEdit = () => {
     setEditingOrg(true);
     setEditForm({
-      name: organiser.name,
-      description: organiser.description || '',
-      location: organiser.location || '',
+      name: organization.name,
+      description: organization.description || '',
+      location: organization.location || '',
     });
   };
 
   const handleEditSave = async () => {
     if (!editForm.name.trim()) return;
-    await updateOrganiser(organiser.id, {
+    await updateOrganization(organization.id, {
       name: editForm.name,
       description: editForm.description || null,
       location: editForm.location || null,
@@ -79,25 +79,25 @@ export default function OrganiserDashboard() {
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
   if (error) return <div className="text-center py-12 text-red-400">{error}</div>;
-  if (!organiser) return <div className="text-center py-12 text-slate-400">No organiser profile found.</div>;
+  if (!organization) return <div className="text-center py-12 text-slate-400">No organiser profile found.</div>;
 
-  const liveTournaments = tournaments.filter(t => t.status === 'active');
-  const upcomingTournaments = tournaments.filter(t => t.status === 'upcoming');
+  const liveTournaments = competitions.filter(t => t.status === 'active');
+  const upcomingTournaments = competitions.filter(t => t.status === 'upcoming');
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="mb-8">
         <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Welcome back</p>
-        <h1 className="text-3xl font-black text-white">{organiser?.name}</h1>
-        {organiser?.location && <p className="text-slate-500 text-sm mt-0.5">📍 {organiser.location}</p>}
+        <h1 className="text-3xl font-black text-white">{organization?.name}</h1>
+        {organization?.location && <p className="text-slate-500 text-sm mt-0.5">📍 {organization.location}</p>}
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
-          <p className="text-emerald-400 font-black text-3xl">{tournaments.length}</p>
-          <p className="text-slate-500 text-xs mt-1">Tournaments</p>
+          <p className="text-emerald-400 font-black text-3xl">{competitions.length}</p>
+          <p className="text-slate-500 text-xs mt-1">Competitions</p>
         </div>
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
           <p className="text-emerald-400 font-black text-3xl">{liveTournaments.length}</p>
@@ -159,11 +159,11 @@ export default function OrganiserDashboard() {
           </div>
         ) : (
           <div className="mt-2">
-            <h3 className="text-xl font-semibold text-white">{organiser.name}</h3>
-            {organiser.description && (
-              <p className="text-slate-400 text-sm mt-1">{organiser.description}</p>
+            <h3 className="text-xl font-semibold text-white">{organization.name}</h3>
+            {organization.description && (
+              <p className="text-slate-400 text-sm mt-1">{organization.description}</p>
             )}
-            <p className="text-slate-500 text-sm mt-0.5">{organiser.location || 'No location set'}</p>
+            <p className="text-slate-500 text-sm mt-0.5">{organization.location || 'No location set'}</p>
           </div>
         )}
       </div>
@@ -171,21 +171,21 @@ export default function OrganiserDashboard() {
       {/* Tournaments */}
       <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Your Tournaments</h2>
-          <Link to={`/admin/tournaments/new?organiser_id=${organiser.id}`}
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Your Competitions</h2>
+          <Link to={`/admin/competitions/new?organiser_id=${organization.id}`}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
             + New
           </Link>
         </div>
 
-        {tournaments.length === 0 ? (
+        {competitions.length === 0 ? (
           <p className="text-slate-500 text-sm text-center py-6">
-            No tournaments yet — create one to get started.
+            No competitions yet — create one to get started.
           </p>
         ) : (
           <div className="space-y-2">
-            {tournaments.map((t) => (
-              <Link key={t.id} to={`/admin/tournaments/${t.id}`}
+            {competitions.map((t) => (
+              <Link key={t.id} to={`/admin/competitions/${t.id}`}
                 className="group flex items-center gap-3 bg-slate-700/30 hover:bg-slate-700/60 border border-slate-700/30 hover:border-slate-600/50 rounded-lg px-4 py-3 transition-all">
                 <div className="w-0.5 self-stretch rounded-full bg-slate-600 group-hover:bg-emerald-500 transition-colors shrink-0" />
                 <div className="flex-1 min-w-0">

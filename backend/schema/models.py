@@ -4,13 +4,10 @@ Compatible with FastAPI and PostgreSQL
 """
 
 import uuid
-from datetime import date, datetime
 from enum import Enum as PyEnum
-from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -18,12 +15,13 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -89,37 +87,98 @@ class PlayerPosition(str, PyEnum):
     FORWARD = "forward"
 
 
+class MembershipRole(str, PyEnum):
+    PLATFORM_OWNER = "platform_owner"
+    PLATFORM_ADMIN = "platform_admin"
+    PLATFORM_SUPPORT = "platform_support"
+    ORG_OWNER = "org_owner"
+    ORG_ADMIN = "org_admin"
+    COMPETITION_ADMIN = "competition_admin"
+    FIXTURES_MANAGER = "fixtures_manager"
+    REGISTRATIONS_MANAGER = "registrations_manager"
+    STATS_MANAGER = "stats_manager"
+    FINANCE_MANAGER = "finance_manager"
+    MEDIA_MANAGER = "media_manager"
+    CLUB_ADMIN = "club_admin"
+    TEAM_MANAGER = "team_manager"
+    COACH = "coach"
+    MATCH_COMMISSIONER = "match_commissioner"
+    REFEREE_CAPTURE_USER = "referee_capture_user"
+
+
+class RegistrationStatus(str, PyEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+
+
+class SurfaceType(str, PyEnum):
+    GRASS = "grass"
+    ARTIFICIAL = "artificial"
+    FUTSAL = "futsal"
+    SAND = "sand"
+    OTHER = "other"
+
+
+class AgeGroup(str, PyEnum):
+    OPEN = "open"
+    U9 = "u9"
+    U11 = "u11"
+    U13 = "u13"
+    U15 = "u15"
+    U17 = "u17"
+    U19 = "u19"
+    U21 = "u21"
+    SENIOR = "senior"
+    VETERANS = "veterans"
+    WOMENS = "womens"
+    GIRLS = "girls"
+
+
 # =============================================================================
 # USER MODEL
 # =============================================================================
 
 class User(Base):
-    """Platform users who manage tournaments"""
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), nullable=False, unique=True)
+    email = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(
         Enum(UserRole, name="user_role", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=UserRole.ORGANISER
+        default=UserRole.ORGANISER,
     )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    organisers = relationship(
-        "Organiser",
-        back_populates="owner",
+    organizations = relationship(
+        "Organization",
+        back_populates="created_by",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+    )
+    memberships = relationship(
+        "Membership",
+        foreign_keys="Membership.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    granted_memberships = relationship(
+        "Membership",
+        foreign_keys="Membership.granted_by",
+        back_populates="grantor",
+        passive_deletes=True,
     )
 
     __table_args__ = (
+        UniqueConstraint("email", name="users_email_unique"),
         Index("idx_users_email", "email", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_users_role", "role", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -127,102 +186,189 @@ class User(Base):
 
 
 # =============================================================================
-# ORGANISER MODEL
+# ORGANIZATION MODEL
 # =============================================================================
 
-class Organiser(Base):
-    """Entity that hosts tournaments"""
-    __tablename__ = "organisers"
+class Organization(Base):
+    __tablename__ = "organizations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    owner_user_id = Column(
+    created_by_user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
     description = Column(Text, nullable=True)
     location = Column(String(255), nullable=True)
+    city = Column(String(100), nullable=True)
+    province = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=False, default="South Africa")
     logo_url = Column(String(500), nullable=True)
+    banner_url = Column(String(500), nullable=True)
+    website_url = Column(String(500), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    onboarded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    owner = relationship("User", back_populates="organisers")
-    tournaments = relationship(
-        "Tournament",
-        back_populates="organiser",
+    created_by = relationship("User", back_populates="organizations")
+    memberships = relationship(
+        "Membership",
+        back_populates="organization",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+    )
+    competitions = relationship(
+        "Competition",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    venues = relationship(
+        "Venue",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    clubs = relationship(
+        "Club",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    media_posts = relationship(
+        "MediaPost",
+        back_populates="organization",
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("owner_user_id", "name", name="organisers_name_per_owner_unique"),
-        Index("idx_organisers_owner_user_id", "owner_user_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_organisers_name", "name", postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("created_by_user_id", "name", name="organizations_name_per_owner_unique"),
+        Index("idx_organizations_slug", "slug", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_organizations_country", "country", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
-        return f"<Organiser(id={self.id}, name={self.name})>"
+        return f"<Organization(id={self.id}, name={self.name})>"
 
 
 # =============================================================================
-# TOURNAMENT MODEL
+# MEMBERSHIP MODEL
 # =============================================================================
 
-class Tournament(Base):
-    """Represents the tournament brand (e.g. 'Blouberg Easter Tournament')"""
-    __tablename__ = "tournaments"
+class Membership(Base):
+    __tablename__ = "memberships"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organiser_id = Column(
+    user_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("organisers.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    role = Column(
+        Enum(MembershipRole, name="membership_role", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    scope_type = Column(String(50), nullable=True)
+    scope_id = Column(UUID(as_uuid=True), nullable=True)
+    granted_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    granted_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], back_populates="memberships")
+    grantor = relationship("User", foreign_keys=[granted_by], back_populates="granted_memberships")
+    organization = relationship("Organization", back_populates="memberships")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "organization_id", "role", "scope_id", name="memberships_unique_role"),
+        Index("idx_memberships_user_id", "user_id", postgresql_where=text("is_active = TRUE")),
+        Index("idx_memberships_organization_id", "organization_id", postgresql_where=text("is_active = TRUE")),
+    )
+
+    def __repr__(self):
+        return f"<Membership(id={self.id}, user_id={self.user_id}, role={self.role})>"
+
+
+# =============================================================================
+# COMPETITION MODEL
+# =============================================================================
+
+class Competition(Base):
+    __tablename__ = "competitions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
     )
     name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
     description = Column(Text, nullable=True)
     logo_url = Column(String(500), nullable=True)
-    age_group = Column(String(50), nullable=True)
+    banner_url = Column(String(500), nullable=True)
+    sport_type = Column(String(50), nullable=False, default="football")
+    visibility = Column(String(20), nullable=False, default="public")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    organiser = relationship("Organiser", back_populates="tournaments")
-    editions = relationship(
-        "Edition",
-        back_populates="tournament",
+    organization = relationship("Organization", back_populates="competitions")
+    seasons = relationship(
+        "Season",
+        back_populates="competition",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+    )
+    media_posts = relationship(
+        "MediaPost",
+        back_populates="competition",
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("organiser_id", "name", name="tournaments_name_per_organiser_unique"),
-        Index("idx_tournaments_organiser_id", "organiser_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_tournaments_name", "name", postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("organization_id", "name", name="competitions_name_per_org_unique"),
+        Index("idx_competitions_organization_id", "organization_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_competitions_slug", "slug", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
-        return f"<Tournament(id={self.id}, name={self.name})>"
+        return f"<Competition(id={self.id}, name={self.name})>"
 
 
 # =============================================================================
-# EDITION MODEL
+# SEASON MODEL
 # =============================================================================
 
-class Edition(Base):
-    """Represents a specific yearly event (e.g. 'Blouberg Easter Tournament 2026')"""
-    __tablename__ = "editions"
+class Season(Base):
+    __tablename__ = "seasons"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tournament_id = Column(
+    competition_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tournaments.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=False,
     )
     name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
     year = Column(Integer, nullable=False)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
@@ -230,54 +376,220 @@ class Edition(Base):
     format = Column(
         Enum(EditionFormat, name="edition_format", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=EditionFormat.GROUPS_KNOCKOUT
+        default=EditionFormat.GROUPS_KNOCKOUT,
     )
     status = Column(
         Enum(EditionStatus, name="edition_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=EditionStatus.UPCOMING
+        default=EditionStatus.UPCOMING,
     )
+    description = Column(Text, nullable=True)
+    banner_url = Column(String(500), nullable=True)
+    registration_deadline = Column(Date, nullable=True)
+    max_teams = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    tournament = relationship("Tournament", back_populates="editions")
+    competition = relationship("Competition", back_populates="seasons")
     teams = relationship(
         "Team",
-        back_populates="edition",
+        back_populates="season",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
     groups = relationship(
         "Group",
-        back_populates="edition",
+        back_populates="season",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
     matches = relationship(
         "Match",
-        back_populates="edition",
+        back_populates="season",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
-    media_posts = relationship(
-        "MediaPost",
-        back_populates="edition",
+    player_registrations = relationship(
+        "PlayerRegistration",
+        back_populates="season",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+    )
+    divisions = relationship(
+        "Division",
+        back_populates="season",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("tournament_id", "year", name="editions_year_per_tournament_unique"),
-        Index("idx_editions_tournament_id", "tournament_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_editions_status", "status", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_editions_year", "year", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_editions_start_date", "start_date", postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("competition_id", "year", name="seasons_year_per_competition_unique"),
+        Index("idx_seasons_competition_id", "competition_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_seasons_status", "status", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
-        return f"<Edition(id={self.id}, name={self.name}, year={self.year})>"
+        return f"<Season(id={self.id}, name={self.name}, year={self.year})>"
+
+
+# =============================================================================
+# DIVISION MODEL
+# =============================================================================
+
+class Division(Base):
+    __tablename__ = "divisions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    season_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
+    age_group = Column(
+        Enum(AgeGroup, name="age_group", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=AgeGroup.OPEN,
+    )
+    format = Column(
+        Enum(EditionFormat, name="edition_format", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=EditionFormat.LEAGUE,
+    )
+    max_teams = Column(Integer, nullable=True)
+    tier = Column(Integer, nullable=True, default=1)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    season = relationship("Season", back_populates="divisions")
+    teams = relationship(
+        "Team",
+        back_populates="division",
+        passive_deletes=True,
+    )
+    matches = relationship(
+        "Match",
+        back_populates="division",
+        passive_deletes=True,
+    )
+    groups = relationship(
+        "Group",
+        back_populates="division",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("season_id", "name", name="divisions_name_per_season_unique"),
+        Index("idx_divisions_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_divisions_age_group", "age_group", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<Division(id={self.id}, name={self.name}, age_group={self.age_group})>"
+
+
+# =============================================================================
+# VENUE MODEL
+# =============================================================================
+
+class Venue(Base):
+    __tablename__ = "venues"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
+    address = Column(Text, nullable=True)
+    city = Column(String(100), nullable=True)
+    province = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=False, default="South Africa")
+    capacity = Column(Integer, nullable=True)
+    surface_type = Column(
+        Enum(SurfaceType, name="surface_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    latitude = Column(Numeric(9, 6), nullable=True)
+    longitude = Column(Numeric(9, 6), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="venues")
+    matches = relationship(
+        "Match",
+        back_populates="venue_rel",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        Index("idx_venues_organization_id", "organization_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<Venue(id={self.id}, name={self.name})>"
+
+
+# =============================================================================
+# CLUB MODEL
+# =============================================================================
+
+class Club(Base):
+    __tablename__ = "clubs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
+    short_name = Column(String(50), nullable=True)
+    logo_url = Column(String(500), nullable=True)
+    home_venue = Column(String(255), nullable=True)
+    city = Column(String(100), nullable=True)
+    province = Column(String(100), nullable=True)
+    founded_year = Column(Integer, nullable=True)
+    contact_email = Column(String(255), nullable=True)
+    contact_phone = Column(String(50), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_public = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="clubs")
+    players = relationship(
+        "Player",
+        back_populates="club",
+        passive_deletes=True,
+    )
+    teams = relationship(
+        "Team",
+        back_populates="club",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="clubs_name_per_org_unique"),
+        Index("idx_clubs_organization_id", "organization_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<Club(id={self.id}, name={self.name})>"
 
 
 # =============================================================================
@@ -285,58 +597,72 @@ class Edition(Base):
 # =============================================================================
 
 class Team(Base):
-    """Teams participating in an edition"""
     __tablename__ = "teams"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    edition_id = Column(
+    season_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("editions.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    club_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("clubs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    division_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("divisions.id", ondelete="SET NULL"),
+        nullable=True,
     )
     name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
+    short_name = Column(String(50), nullable=True)
     logo_url = Column(String(500), nullable=True)
-    coach_name = Column(String(255), nullable=True)
+    is_public = Column(Boolean, nullable=False, default=True)
+    home_colors = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    edition = relationship("Edition", back_populates="teams")
-    players = relationship(
-        "Player",
-        back_populates="team",
-        cascade="all, delete-orphan",
-        passive_deletes=True
-    )
+    season = relationship("Season", back_populates="teams")
+    club = relationship("Club", back_populates="teams")
+    division = relationship("Division", back_populates="teams")
     group_memberships = relationship(
         "GroupTeam",
         back_populates="team",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
+    )
+    player_registrations = relationship(
+        "PlayerRegistration",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     home_matches = relationship(
         "Match",
         foreign_keys="Match.home_team_id",
         back_populates="home_team",
-        passive_deletes=True
+        passive_deletes=True,
     )
     away_matches = relationship(
         "Match",
         foreign_keys="Match.away_team_id",
         back_populates="away_team",
-        passive_deletes=True
+        passive_deletes=True,
     )
     match_events = relationship(
         "MatchEvent",
         back_populates="team",
-        passive_deletes=True
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("edition_id", "name", name="teams_name_per_edition_unique"),
-        Index("idx_teams_edition_id", "edition_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_teams_name", "name", postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("season_id", "name", name="teams_name_per_season_unique"),
+        Index("idx_teams_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_teams_club_id", "club_id", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -348,42 +674,102 @@ class Team(Base):
 # =============================================================================
 
 class Player(Base):
-    """Players belonging to a team"""
     __tablename__ = "players"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    team_id = Column(
+    club_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("teams.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("clubs.id", ondelete="SET NULL"),
+        nullable=True,
     )
     name = Column(String(255), nullable=False)
+    slug = Column(String(120), nullable=True)
     jersey_number = Column(Integer, nullable=True)
     position = Column(
         Enum(PlayerPosition, name="player_position", create_type=False, values_callable=lambda x: [e.value for e in x]),
-        nullable=True
+        nullable=True,
     )
     date_of_birth = Column(Date, nullable=True)
+    nationality = Column(String(100), nullable=True)
+    profile_image = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    team = relationship("Team", back_populates="players")
+    club = relationship("Club", back_populates="players")
+    registrations = relationship(
+        "PlayerRegistration",
+        back_populates="player",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     match_events = relationship(
         "MatchEvent",
         back_populates="player",
-        passive_deletes=True
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("team_id", "jersey_number", name="players_jersey_per_team_unique"),
-        Index("idx_players_team_id", "team_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_players_club_id", "club_id", postgresql_where=text("deleted_at IS NULL")),
         Index("idx_players_name", "name", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
-        return f"<Player(id={self.id}, name={self.name}, jersey={self.jersey_number})>"
+        return f"<Player(id={self.id}, name={self.name})>"
+
+
+# =============================================================================
+# PLAYER REGISTRATION MODEL
+# =============================================================================
+
+class PlayerRegistration(Base):
+    __tablename__ = "player_registrations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    player_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("players.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    season_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    registration_number = Column(String(100), nullable=True)
+    status = Column(
+        Enum(RegistrationStatus, name="registration_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=RegistrationStatus.APPROVED,
+    )
+    jersey_number = Column(Integer, nullable=True)
+    registered_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    player = relationship("Player", back_populates="registrations")
+    team = relationship("Team", back_populates="player_registrations")
+    season = relationship("Season", back_populates="player_registrations")
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "season_id", name="player_reg_unique_per_season"),
+        Index("idx_player_registrations_player_id", "player_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_player_registrations_team_id", "team_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_player_registrations_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<PlayerRegistration(id={self.id}, player_id={self.player_id}, season_id={self.season_id})>"
 
 
 # =============================================================================
@@ -391,14 +777,18 @@ class Player(Base):
 # =============================================================================
 
 class Group(Base):
-    """Groups for group stage tournaments"""
     __tablename__ = "groups"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    edition_id = Column(
+    season_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("editions.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    division_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("divisions.id", ondelete="SET NULL"),
+        nullable=True,
     )
     name = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -406,22 +796,23 @@ class Group(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    edition = relationship("Edition", back_populates="groups")
+    season = relationship("Season", back_populates="groups")
+    division = relationship("Division", back_populates="groups")
     team_memberships = relationship(
         "GroupTeam",
         back_populates="group",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
     matches = relationship(
         "Match",
         back_populates="group",
-        passive_deletes=True
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        UniqueConstraint("edition_id", "name", name="groups_name_per_edition_unique"),
-        Index("idx_groups_edition_id", "edition_id", postgresql_where=text("deleted_at IS NULL")),
+        UniqueConstraint("season_id", "name", name="groups_name_per_season_unique"),
+        Index("idx_groups_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -429,26 +820,24 @@ class Group(Base):
 
 
 # =============================================================================
-# GROUP TEAM MEMBERSHIP MODEL (Junction Table)
+# GROUP TEAM MODEL (Junction Table)
 # =============================================================================
 
 class GroupTeam(Base):
-    """Many-to-many relationship between groups and teams"""
     __tablename__ = "group_teams"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     group_id = Column(
         UUID(as_uuid=True),
         ForeignKey("groups.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     team_id = Column(
         UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
@@ -457,8 +846,6 @@ class GroupTeam(Base):
 
     __table_args__ = (
         UniqueConstraint("group_id", "team_id", name="group_teams_unique"),
-        Index("idx_group_teams_group_id", "group_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_group_teams_team_id", "team_id", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -470,24 +857,33 @@ class GroupTeam(Base):
 # =============================================================================
 
 class Match(Base):
-    """Matches within an edition"""
     __tablename__ = "matches"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    edition_id = Column(
+    season_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("editions.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
     )
     group_id = Column(
         UUID(as_uuid=True),
         ForeignKey("groups.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+    )
+    division_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("divisions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    venue_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("venues.id", ondelete="SET NULL"),
+        nullable=True,
     )
     stage = Column(
         Enum(MatchStage, name="match_stage", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=MatchStage.GROUP
+        default=MatchStage.GROUP,
     )
     matchday = Column(Integer, nullable=True)
     kickoff_datetime = Column(DateTime(timezone=True), nullable=True)
@@ -495,12 +891,12 @@ class Match(Base):
     home_team_id = Column(
         UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     away_team_id = Column(
         UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     home_score = Column(Integer, default=0)
     away_score = Column(Integer, default=0)
@@ -509,41 +905,29 @@ class Match(Base):
     status = Column(
         Enum(MatchStatus, name="match_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=MatchStatus.SCHEDULED
+        default=MatchStatus.SCHEDULED,
     )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    edition = relationship("Edition", back_populates="matches")
+    season = relationship("Season", back_populates="matches")
     group = relationship("Group", back_populates="matches")
-    home_team = relationship(
-        "Team",
-        foreign_keys=[home_team_id],
-        back_populates="home_matches"
-    )
-    away_team = relationship(
-        "Team",
-        foreign_keys=[away_team_id],
-        back_populates="away_matches"
-    )
+    division = relationship("Division", back_populates="matches")
+    venue_rel = relationship("Venue", back_populates="matches")
+    home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="home_matches")
+    away_team = relationship("Team", foreign_keys=[away_team_id], back_populates="away_matches")
     events = relationship(
         "MatchEvent",
         back_populates="match",
         cascade="all, delete-orphan",
-        passive_deletes=True
+        passive_deletes=True,
     )
 
     __table_args__ = (
-        CheckConstraint("home_team_id != away_team_id", name="matches_different_teams"),
-        Index("idx_matches_edition_id", "edition_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_matches_group_id", "group_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_matches_home_team_id", "home_team_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_matches_away_team_id", "away_team_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_matches_kickoff_datetime", "kickoff_datetime", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_matches_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
         Index("idx_matches_status", "status", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_matches_stage", "stage", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -555,31 +939,30 @@ class Match(Base):
 # =============================================================================
 
 class MatchEvent(Base):
-    """Events that occur during a match (goals, cards, substitutions)"""
     __tablename__ = "match_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     match_id = Column(
         UUID(as_uuid=True),
         ForeignKey("matches.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
     team_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("teams.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("teams.id", ondelete="SET NULL"),
+        nullable=True,
     )
     player_id = Column(
         UUID(as_uuid=True),
         ForeignKey("players.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
     )
     event_type = Column(
         Enum(EventType, name="event_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
-        nullable=False
+        nullable=False,
     )
-    minute = Column(Integer, nullable=False)
-    additional_info = Column(JSONB, nullable=True)
+    minute = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -590,11 +973,8 @@ class MatchEvent(Base):
     player = relationship("Player", back_populates="match_events")
 
     __table_args__ = (
-        CheckConstraint("minute >= 0 AND minute <= 150", name="match_events_minute_check"),
         Index("idx_match_events_match_id", "match_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_match_events_team_id", "team_id", postgresql_where=text("deleted_at IS NULL")),
         Index("idx_match_events_player_id", "player_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_match_events_event_type", "event_type", postgresql_where=text("deleted_at IS NULL")),
     )
 
     def __repr__(self):
@@ -606,29 +986,29 @@ class MatchEvent(Base):
 # =============================================================================
 
 class MediaPost(Base):
-    """Media posts for tournament announcements and images"""
     __tablename__ = "media_posts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    edition_id = Column(
+    organization_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("editions.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
     )
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=True)
+    competition_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    title = Column(String(255), nullable=True)
+    body = Column(Text, nullable=True)
     image_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    edition = relationship("Edition", back_populates="media_posts")
-
-    __table_args__ = (
-        Index("idx_media_posts_edition_id", "edition_id", postgresql_where=text("deleted_at IS NULL")),
-        Index("idx_media_posts_created_at", "created_at", postgresql_where=text("deleted_at IS NULL")),
-    )
+    organization = relationship("Organization", back_populates="media_posts")
+    competition = relationship("Competition", back_populates="media_posts")
 
     def __repr__(self):
         return f"<MediaPost(id={self.id}, title={self.title})>"
