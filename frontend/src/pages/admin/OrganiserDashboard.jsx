@@ -203,6 +203,46 @@ export default function OrganiserDashboard() {
         )}
       </div>
 
+      {/* Clubs Card */}
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Clubs</h2>
+          <Link
+            to={`/admin/organizations/${organization.id}/clubs/new?organization_id=${organization.id}`}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+          >
+            + Add
+          </Link>
+        </div>
+        <p className="text-slate-500 text-sm mt-1">Manage clubs registered in your organisation</p>
+        <Link
+          to={`/admin/organizations/${organization.id}/clubs`}
+          className="text-emerald-400 hover:text-emerald-300 text-sm mt-3 inline-block"
+        >
+          View all clubs →
+        </Link>
+      </div>
+
+      {/* Officials Card */}
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Officials</h2>
+          <Link
+            to={`/admin/organizations/${organization.id}/officials/new?organization_id=${organization.id}`}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+          >
+            + Add
+          </Link>
+        </div>
+        <p className="text-slate-500 text-sm mt-1">Manage match officials for your organisation</p>
+        <Link
+          to={`/admin/organizations/${organization.id}/officials`}
+          className="text-emerald-400 hover:text-emerald-300 text-sm mt-3 inline-block"
+        >
+          View all officials →
+        </Link>
+      </div>
+
       {/* Change Password Card */}
       <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mt-6">
         <div className="flex items-center justify-between mb-2">

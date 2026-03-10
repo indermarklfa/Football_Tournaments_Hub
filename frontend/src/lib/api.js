@@ -54,6 +54,15 @@ export const updateSeason = (id, data) => api.patch(`/api/seasons/${id}`, data);
 export const getAliveTeams = (seasonId) => api.get(`/api/seasons/${seasonId}/alive-teams`);
 export const cloneSeason = (id, data) => api.post(`/api/seasons/${id}/clone`, data);
 
+// Divisions
+export const createDivision = (data) => api.post('/api/divisions', data);
+export const getDivisions = (season_id) => api.get(`/api/divisions?season_id=${season_id}`);
+export const getDivision = (id) => api.get(`/api/divisions/${id}`);
+export const updateDivision = (id, data) => api.patch(`/api/divisions/${id}`, data);
+
+// Standings
+export const getStandings = (division_id) => api.get(`/api/standings?division_id=${division_id}`);
+
 // Clubs (new)
 export const createClub = (data) => api.post('/api/clubs', data);
 export const getClubs = (organizationId) => api.get(`/api/clubs?organization_id=${organizationId}`);
@@ -62,7 +71,11 @@ export const updateClub = (id, data) => api.patch(`/api/clubs/${id}`, data);
 
 // Teams
 export const createTeam = (data) => api.post('/api/teams', data);
-export const getTeams = (seasonId) => api.get(`/api/teams?season_id=${seasonId}`);
+export const getTeams = (seasonId, divisionId) => {
+  const qs = new URLSearchParams({ season_id: seasonId });
+  if (divisionId) qs.append('division_id', divisionId);
+  return api.get(`/api/teams?${qs.toString()}`);
+};
 export const updateTeam = (id, data) => api.patch(`/api/teams/${id}`, data);
 export const deleteTeam = (id) => api.post(`/api/teams/${id}/delete`);
 
@@ -79,8 +92,40 @@ export const deleteGroup = (groupId) => api.delete(`/api/groups/${groupId}`);
 export const addTeamToGroup = (groupId, teamId) => api.post(`/api/groups/${groupId}/teams/${teamId}`);
 export const removeTeamFromGroup = (groupId, teamId) => api.delete(`/api/groups/${groupId}/teams/${teamId}`);
 
+// Officials
+export const getOrganizationOfficials = (organization_id) => api.get(`/api/officials?organization_id=${organization_id}`);
+export const createOfficial = (data) => api.post('/api/officials', data);
+export const updateOfficial = (id, data) => api.patch(`/api/officials/${id}`, data);
+export const getMatchOfficials = (match_id) => api.get(`/api/match-officials?match_id=${match_id}`);
+export const assignMatchOfficial = (data) => api.post('/api/match-officials', data);
+export const removeMatchOfficial = (id) => api.delete(`/api/match-officials/${id}`);
+
+// Lineups
+export const getLineup = (match_id, team_id) => api.get(`/api/lineups?match_id=${match_id}&team_id=${team_id}`);
+export const addToLineup = (data) => api.post('/api/lineups', data);
+export const updateLineup = (id, data) => api.patch(`/api/lineups/${id}`, data);
+
+// Discipline
+export const getDiscipline = (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.season_id) qs.append('season_id', params.season_id);
+  if (params.player_id) qs.append('player_id', params.player_id);
+  if (params.team_id) qs.append('team_id', params.team_id);
+  if (params.division_id) qs.append('division_id', params.division_id);
+  const query = qs.toString();
+  return api.get(`/api/discipline${query ? `?${query}` : ''}`);
+};
+export const createDisciplinaryAction = (data) => api.post('/api/discipline', data);
+export const updateDisciplinaryAction = (id, data) => api.patch(`/api/discipline/${id}`, data);
+export const getSeasonDiscipline = (season_id, division_id) => {
+  const qs = new URLSearchParams({ season_id });
+  if (division_id) qs.append('division_id', division_id);
+  return api.get(`/api/discipline?${qs.toString()}`);
+};
+
 // Matches
 export const createMatch = (data) => api.post('/api/matches', data);
+export const getMatch = (id) => api.get(`/api/matches/${id}`);
 export const getMatches = (seasonId) => api.get(`/api/matches?season_id=${seasonId}`);
 export const updateMatch = (id, data) => api.patch(`/api/matches/${id}`, data);
 export const deleteMatch = (id) => api.post(`/api/matches/${id}/delete`);

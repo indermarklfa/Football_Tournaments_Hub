@@ -27,6 +27,10 @@ from schema.models import (
     MatchStatus,
     MatchEvent,
     EventType,
+    Official,
+    MatchOfficial,
+    Lineup,
+    DisciplinaryAction,
     MediaPost,
 )
 
@@ -58,5 +62,9 @@ __all__ = [
     "MatchStatus",
     "MatchEvent",
     "EventType",
+    "Official",
+    "MatchOfficial",
+    "Lineup",
+    "DisciplinaryAction",
     "MediaPost",
 ]

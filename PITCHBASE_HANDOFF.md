@@ -108,28 +108,42 @@ Club (persistent football club, linked to organization)
 - Both dashboards working
 - Public pages working
 
-### Phase 2 — Core Operations 🔴 IN PROGRESS
-**Next task: Divisions Router**
+## Current State (as of Session 3 end)
 
-The `divisions` table exists in the database (migration 002 complete).
-The `Division` and `AgeGroup` models exist in `backend/schema/models.py`.
-`Division` and `AgeGroup` are exported from `backend/schema/__init__.py` and `backend/app/models.py`.
+### Phase 2 — Core Operations ✅ COMPLETE
+- Divisions router (CRUD, ownership, soft-delete)
+- Standings engine (GET /standings?division_id=...)
+- Teams, Matches, Groups — all updated with division_id
+- Frontend: DivisionList, NewDivision, EditDivision, DivisionStandings pages
+- Frontend: DivisionTeams page — teams added by picking a club, name auto-generated
+- Frontend: ClubList, NewClub pages
+- Competition detail page has Divisions + Discipline links on each season row
+- Dashboard has Clubs and Officials cards
 
-**What still needs to be built for Phase 2:**
-1. `backend/app/routers/divisions.py` — CRUD for divisions
-2. Wire `divisions` router into `backend/app/main.py`
-3. Update `teams.py` router — teams now belong to a division, not just a season
-4. Update `matches.py` router — matches now belong to a division
-5. Update `groups.py` router — groups now belong to a division
-6. Standings engine — compute league table per division from match results
-7. Frontend — division management UI (create divisions, assign teams to divisions)
-8. Frontend — standings table display per division
-9. Officials table and router (Phase 2 later)
-10. Lineups table and router (Phase 2 later)
-11. Discipline actions (Phase 2 later)
+### Phase 3 — Officials, Lineups & Discipline ✅ BACKEND COMPLETE
+- Officials model + router (officials, match_officials)
+- Lineups model + router
+- DisciplinaryAction model + router
+- Migration 003 applied
+- Frontend pages created: MatchDetail (4 sections), OfficialsList, NewOfficial, SeasonDiscipline
 
----
+### Known Issues / Next Session Tasks
+1. Old EditionTeams page still has manual team name input — needs to be removed
+   (teams are now added through Divisions → Teams using club picker)
+2. Old EditionMatches page still has old match creation form — needs to be 
+   updated to be division-aware (pick division, then home/away team from that division)
+3. MatchDetail page not yet tested — needs a real match to test against
+4. Player registration flow not yet built (players join a club, register to teams per season)
+5. Transfer system not yet built (player moves between clubs)
 
+### Key IDs (test data)
+- Organization: Indermark FC — 94167497-bade-44ee-b906-0e99a16ef115
+- Competition: Indermark Cup
+- Season: Indermark Cup 2026 — 4480f1dc-8a74-4b35-ac09-2b95e8ebd86b
+- Division: U13 Development League
+- Club: All Stars FC
+- Team: All Stars FC U13
+- Test user: admin@pitchbase.co.za / Test1234!
 ## Key Business Rules (from Blueprint)
 1. A club can have multiple teams in the same season (different divisions)
 2. A player registers to a team per season — not permanently attached

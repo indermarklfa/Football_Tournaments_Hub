@@ -245,6 +245,12 @@ class Organization(Base):
         back_populates="organization",
         passive_deletes=True,
     )
+    officials = relationship(
+        "Official",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("created_by_user_id", "name", name="organizations_name_per_owner_unique"),
@@ -419,6 +425,12 @@ class Season(Base):
     )
     divisions = relationship(
         "Division",
+        back_populates="season",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    disciplinary_actions = relationship(
+        "DisciplinaryAction",
         back_populates="season",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -658,6 +670,16 @@ class Team(Base):
         back_populates="team",
         passive_deletes=True,
     )
+    lineups = relationship(
+        "Lineup",
+        back_populates="team",
+        passive_deletes=True,
+    )
+    disciplinary_actions = relationship(
+        "DisciplinaryAction",
+        back_populates="team",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("season_id", "name", name="teams_name_per_season_unique"),
@@ -706,6 +728,16 @@ class Player(Base):
     )
     match_events = relationship(
         "MatchEvent",
+        back_populates="player",
+        passive_deletes=True,
+    )
+    lineups = relationship(
+        "Lineup",
+        back_populates="player",
+        passive_deletes=True,
+    )
+    disciplinary_actions = relationship(
+        "DisciplinaryAction",
         back_populates="player",
         passive_deletes=True,
     )
@@ -924,6 +956,24 @@ class Match(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    officials = relationship(
+        "MatchOfficial",
+        back_populates="match",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    lineups = relationship(
+        "Lineup",
+        back_populates="match",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    disciplinary_actions = relationship(
+        "DisciplinaryAction",
+        back_populates="match",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         Index("idx_matches_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
@@ -979,6 +1029,181 @@ class MatchEvent(Base):
 
     def __repr__(self):
         return f"<MatchEvent(id={self.id}, type={self.event_type}, minute={self.minute})>"
+
+
+# =============================================================================
+# OFFICIAL MODEL
+# =============================================================================
+
+class Official(Base):
+    __tablename__ = "officials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    role = Column(String(100), nullable=True)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="officials")
+    match_assignments = relationship(
+        "MatchOfficial",
+        back_populates="official",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        Index("idx_officials_organization_id", "organization_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<Official(id={self.id}, name={self.name}, role={self.role})>"
+
+
+# =============================================================================
+# MATCH OFFICIAL MODEL
+# =============================================================================
+
+class MatchOfficial(Base):
+    __tablename__ = "match_officials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    match_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("matches.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    official_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("officials.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    match = relationship("Match", back_populates="officials")
+    official = relationship("Official", back_populates="match_assignments")
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "official_id", name="match_officials_unique"),
+    )
+
+    def __repr__(self):
+        return f"<MatchOfficial(match_id={self.match_id}, official_id={self.official_id})>"
+
+
+# =============================================================================
+# LINEUP MODEL
+# =============================================================================
+
+class Lineup(Base):
+    __tablename__ = "lineups"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    match_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("matches.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    player_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("players.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    starting = Column(Boolean, nullable=False, default=True)
+    jersey_number = Column(Integer, nullable=True)
+    position = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    match = relationship("Match", back_populates="lineups")
+    team = relationship("Team", back_populates="lineups")
+    player = relationship("Player", back_populates="lineups")
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "player_id", name="lineups_player_per_match_unique"),
+        Index("idx_lineups_match_id", "match_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_lineups_team_id", "team_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<Lineup(match_id={self.match_id}, player_id={self.player_id}, starting={self.starting})>"
+
+
+# =============================================================================
+# DISCIPLINARY ACTION MODEL
+# =============================================================================
+
+class DisciplinaryAction(Base):
+    __tablename__ = "disciplinary_actions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    match_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("matches.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    player_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("players.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    team_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    season_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("seasons.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    division_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("divisions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    action_type = Column(String(50), nullable=False)
+    minute = Column(Integer, nullable=True)
+    reason = Column(Text, nullable=True)
+    suspension_matches = Column(Integer, nullable=True, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    match = relationship("Match", back_populates="disciplinary_actions")
+    player = relationship("Player", back_populates="disciplinary_actions")
+    team = relationship("Team", back_populates="disciplinary_actions")
+    season = relationship("Season", back_populates="disciplinary_actions")
+
+    __table_args__ = (
+        Index("idx_disciplinary_player_id", "player_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_disciplinary_match_id", "match_id", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_disciplinary_season_id", "season_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    def __repr__(self):
+        return f"<DisciplinaryAction(id={self.id}, player_id={self.player_id}, action_type={self.action_type})>"
 
 
 # =============================================================================

@@ -9,12 +9,17 @@ from app.routers import (
     organizations,
     competitions,
     seasons,
+    divisions,
+    standings,
     clubs,
     teams,
     players,
     matches,
     match_events,
     groups,
+    officials,
+    lineups,
+    discipline,
     public,
     admin,
     uploads,
@@ -44,12 +49,17 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")
 app.include_router(competitions.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
+app.include_router(divisions.router, prefix="/api")
+app.include_router(standings.router, prefix="/api")
 app.include_router(clubs.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
 app.include_router(players.router, prefix="/api")
 app.include_router(matches.router, prefix="/api")
 app.include_router(match_events.router, prefix="/api")
 app.include_router(groups.router, prefix="/api")
+app.include_router(officials.router, prefix="/api")
+app.include_router(lineups.router, prefix="/api")
+app.include_router(discipline.router, prefix="/api")
 app.include_router(public.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(uploads.router)

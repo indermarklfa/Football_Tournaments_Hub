@@ -6,8 +6,9 @@ from typing import Optional
 
 
 class MatchCreate(BaseModel):
-    edition_id: UUID
+    season_id: UUID
     group_id: Optional[UUID] = None
+    division_id: Optional[UUID] = None
     stage: str = "group"
     matchday: Optional[int] = None
     kickoff_datetime: Optional[datetime] = None
@@ -18,6 +19,7 @@ class MatchCreate(BaseModel):
 
 class MatchUpdate(BaseModel):
     group_id: Optional[UUID] = None
+    division_id: Optional[UUID] = None
     stage: Optional[str] = None
     matchday: Optional[int] = None
     kickoff_datetime: Optional[datetime] = None
@@ -34,8 +36,9 @@ class MatchUpdate(BaseModel):
 
 class MatchResponse(BaseModel):
     id: UUID
-    edition_id: UUID
+    season_id: UUID
     group_id: Optional[UUID]
+    division_id: Optional[UUID]
     stage: str
     matchday: Optional[int]
     kickoff_datetime: Optional[datetime]

@@ -306,8 +306,12 @@ export default function TournamentDetail() {
                       className="text-emerald-400 hover:text-emerald-300 text-sm">Edit</button>
                     <Link to={`/admin/seasons/${e.id}/teams`}
                       className="text-emerald-400 hover:underline text-sm">Teams</Link>
+                    <Link to={`/admin/seasons/${e.id}/divisions`}
+                      className="text-emerald-400 hover:underline text-sm">Divisions</Link>
                     <Link to={`/admin/seasons/${e.id}/matches`}
                       className="text-emerald-400 hover:underline text-sm">Matches</Link>
+                    <Link to={`/admin/seasons/${e.id}/discipline`}
+                      className="text-emerald-400 hover:underline text-sm">Discipline</Link>
                     <button onClick={() => {
                       setCloningSeason(e);
                       setCloneForm({ name: `${e.name} (Copy)`, year: new Date().getFullYear() + 1, venue: e.venue || '', start_date: '', end_date: '' });

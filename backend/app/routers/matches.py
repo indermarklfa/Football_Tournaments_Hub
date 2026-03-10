@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, Organization, Competition, Season, Match, MatchStage, MatchStatus, Group, GroupTeam
+from app.models import User, Organization, Competition, Season, Match, MatchStage, MatchStatus, Group, GroupTeam, Division
 from app.deps import get_current_user
 from app.schemas.match import MatchCreate, MatchUpdate, MatchResponse
 from pydantic import BaseModel
@@ -26,6 +26,20 @@ async def verify_edition_ownership(db: AsyncSession, season_id: UUID, user: User
         raise HTTPException(status_code=403, detail="Season not owned by user")
 
 
+async def verify_division_ownership(db: AsyncSession, division_id: UUID, user: User):
+    if user.role.value == 'admin':
+        return
+    result = await db.execute(
+        select(Division).join(Season).join(Competition).join(Organization).where(
+            Division.id == division_id,
+            Division.deleted_at.is_(None),
+            Organization.created_by_user_id == user.id,
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Division not owned by user")
+
+
 async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User) -> Match:
     result = await db.execute(
         select(Match).join(Season).join(Competition).join(Organization).where(Match.id == match_id, Organization.created_by_user_id == user.id, Match.deleted_at.is_(None))
@@ -39,6 +53,8 @@ async def get_match_with_ownership(db: AsyncSession, match_id: UUID, user: User)
 @router.post("", response_model=MatchResponse, status_code=status.HTTP_201_CREATED)
 async def create_match(req: MatchCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     await verify_edition_ownership(db, req.season_id, user)
+    if req.division_id is not None:
+        await verify_division_ownership(db, req.division_id, user)
     data = req.model_dump()
     data["stage"] = MatchStage(data["stage"])
     m = Match(**data)
@@ -49,9 +65,12 @@ async def create_match(req: MatchCreate, db: AsyncSession = Depends(get_db), use
 
 
 @router.get("", response_model=list[MatchResponse])
-async def list_matches(season_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def list_matches(season_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user), division_id: Optional[UUID] = None):
     await verify_edition_ownership(db, season_id, user)
-    result = await db.execute(select(Match).where(Match.season_id == season_id, Match.deleted_at.is_(None)))
+    filters = [Match.season_id == season_id, Match.deleted_at.is_(None)]
+    if division_id is not None:
+        filters.append(Match.division_id == division_id)
+    result = await db.execute(select(Match).where(*filters))
     return result.scalars().all()
 
 

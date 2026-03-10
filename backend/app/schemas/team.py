@@ -6,25 +6,30 @@ from typing import Optional
 
 
 class TeamCreate(BaseModel):
-    edition_id: UUID
-    name: str
-    logo_url: Optional[str] = None
-    coach_name: Optional[str] = None
+    season_id: UUID
+    club_id: UUID
+    division_id: UUID
 
 
 class TeamUpdate(BaseModel):
     name: Optional[str] = None
+    club_id: Optional[UUID] = None
+    division_id: Optional[UUID] = None
     logo_url: Optional[str] = None
-    coach_name: Optional[str] = None
+    short_name: Optional[str] = None
+    home_colors: Optional[str] = None
     deleted: Optional[bool] = None
 
 
 class TeamResponse(BaseModel):
     id: UUID
-    edition_id: UUID
+    season_id: UUID
+    club_id: Optional[UUID]
+    division_id: Optional[UUID]
     name: str
     logo_url: Optional[str]
-    coach_name: Optional[str]
+    short_name: Optional[str]
+    home_colors: Optional[str]
     created_at: datetime
 
     class Config:
