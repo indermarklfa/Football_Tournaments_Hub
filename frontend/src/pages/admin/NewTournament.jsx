@@ -4,7 +4,7 @@ import { createCompetition, getOrganizations } from '../../lib/api';
 
 export default function NewTournament() {
   const [searchParams] = useSearchParams();
-  const [organizationId, setOrganizationId] = useState(searchParams.get('organiser_id') || '');
+  const [organizationId, setOrganizationId] = useState(searchParams.get('organization_id') || '');
   const [organizations, setOrganizations] = useState([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -24,7 +24,7 @@ export default function NewTournament() {
       const res = await createCompetition({ organization_id: organizationId, name, description: description || null, age_group: ageGroup || null });
       navigate(`/admin/competitions/${res.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create tournament');
+      setError(err.response?.data?.detail || 'Failed to create competition');
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ export default function NewTournament() {
           <select value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} required
             className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
             data-testid="organiser-select">
-            <option value="">Select organiser</option>
+            <option value="">Select organization</option>
             {organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
         </div>

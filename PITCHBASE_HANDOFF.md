@@ -18,43 +18,118 @@
 ---
 
 ## Working Style
-- I have little coding experience — never assume I know things
+- I want bulk edits, lets not waste credits
 - Always walk me through everything clearly
-- Work step by step so we can debug as we go
+- Work efficiently to save Claude credit limits
 - Use Claude Code for file creation and editing tasks
 - Use PowerShell terminal commands for migrations, server starts, and verification
-- Paste terminal results back for confirmation before moving on
 
 ---
 
-## Current State (as of Session 2 end)
+## How to Start Each Session
+1. Open VS Code at `C:\Users\bashi\Documents\Football_Tournaments_Hub`
+2. Open PowerShell terminal and run: `& .venv\Scripts\Activate.ps1`
+3. Start backend: `cd backend` then `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+4. Open a second terminal, start frontend: `cd frontend` then `npm start`
+5. Test health: `Invoke-RestMethod -Uri http://localhost:8000/api/health`
+6. Paste this document at the start of the new chat
 
-### Database
-- 15 tables live in `pitchbase` database
-- Latest migration: `002_add_divisions` ✅
-- Tables: `alembic_version`, `clubs`, `competitions`, `divisions`, `group_teams`, `groups`, `match_events`, `matches`, `media_posts`, `memberships`, `organizations`, `player_registrations`, `players`, `seasons`, `teams`
+---
 
-### Backend
-- Running on FastAPI, port 8000
-- All routers working: `auth`, `organizations`, `competitions`, `seasons`, `clubs`, `teams`, `players`, `matches`, `match_events`, `groups`, `public`, `admin`, `uploads`
-- Models file: `backend/schema/models.py` — contains all models including new `Division` and `AgeGroup`
-- Alembic migrations in: `backend/alembic/versions/`
-
-### Frontend
-- Running on React, port 3000
-- All API calls updated in `frontend/src/lib/api.js`
-- All admin pages updated to use new entity names
-- Branding updated throughout — PitchBase everywhere
-- Public routes: `/competitions/:id`, `/seasons/:id`, `/matches/:id`
-- Admin routes: `/admin/competitions/new`, `/admin/seasons/:id/teams`, etc.
-
-### Test User
+## Test User
 - Email: `admin@pitchbase.co.za`
 - Password: `Test1234!`
 - Role: `admin` (platform admin)
-- Has organization: `Indermark FC` (slug: `indermark-fc`)
-- Has competition: `Indermark Cup`
-- Has season: `Indermark Cup 2026`
+- No organization yet — needs to be created fresh this session
+
+---
+
+## Current State (as of Session 4 end)
+
+### What was done this session
+1. Deleted the obsolete `EditionTeams` page and removed all links to it
+2. Completed a full database schema redesign based on the PitchBase Blueprint
+3. Added `football_structures` table for SAFA → Province → Region → LFA → Stream hierarchy
+4. Added `users` and `memberships` auth tables back (they were accidentally dropped)
+5. Ran clean migration — all 19 tables created successfully
+6. Rewrote all backend routers to match new schema
+7. Fixed enum casing bug (`UserRole` values must be lowercase to match PostgreSQL)
+8. Backend starts clean, health check passes, login works
+
+### Database
+- 19 tables live in `pitchbase` database
+- Latest migration: `001_initial_schema` ✅
+- All old migrations deleted and replaced with one clean initial schema
+
+### Backend
+- Running on FastAPI, port 8000
+- All routers rewritten and working
+- Old `.old` router files left in place (can be deleted next session)
+
+### Frontend
+- Still running on old schema references — **not yet updated this session**
+- Will break on most pages until routers and API calls are updated
+- Login page should still work (auth endpoints unchanged)
+
+---
+
+## Database Architecture
+
+### 19 Tables across 5 layers
+
+```
+Layer 1 — Persistent Entities
+  users, organizations, competitions, seasons, divisions
+  clubs, players, venues, football_structures
+
+Layer 2 — Player/Club Relationships
+  club_player_memberships, transfers
+
+Layer 3 — Competition Participation
+  teams, player_registrations, groups, group_teams, memberships
+
+Layer 4 — Match Operations
+  matches, match_lineups, match_events
+
+Layer 5 — Content
+  media_posts
+```
+
+### Architecture diagram
+```
+Organization (multi-tenant root, owned by a user)
+└── Competition (e.g. Indermark Development League)
+    └── Season (e.g. 2026)
+        └── Division (e.g. U13 League — format: league, age_group: u13)
+            ├── Teams (club entry into division — UNIQUE per club+division)
+            │   └── PlayerRegistrations (player eligible for this team)
+            ├── Groups (for group stage divisions)
+            └── Matches → MatchLineups + MatchEvents
+
+Club (persistent, linked to organization)
+└── ClubPlayerMembership (time-based — player belongs to club from/to date)
+    └── Transfer (explicit business event when player moves clubs)
+
+Player (global entity — no permanent club attachment)
+└── PlayerRegistration (registered to a team for a season)
+    └── MatchLineup (actually played in a match)
+        └── MatchEvent (goal, card, sub, etc.)
+
+FootballStructure (SAFA governance hierarchy)
+  SAFA National → Province → Region → LFA → Stream
+  - clubs.home_structure_id → their LFA/Stream
+  - competitions.host_structure_id → where competition sits
+```
+
+### Key business rules
+1. A player is a global entity — not permanently owned by any club
+2. Club membership is time-based via `club_player_memberships`
+3. A team = one club entry into one division (UNIQUE club_id + division_id)
+4. A club can have multiple teams in the same season across different divisions
+5. A player can register for multiple teams in the same club in the same season
+6. Player registration ≠ match participation (separate tables)
+7. Standings are always derived from match results — never manually entered
+8. Divisions are season-specific — historical queries use `age_group` field
 
 ---
 
@@ -67,91 +142,66 @@
 | `edition_id` | `season_id` |
 | `tournament_id` | `competition_id` |
 | `organiser_id` | `organization_id` |
-| `players.team_id` | `players.club_id` |
+| `players.name` | `players.first_name + last_name` |
+| `players.team_id` | Removed — players are global |
+| `teams.edition_id` | `teams.division_id` |
+| `matches.edition_id` | `matches.division_id` |
+| `matches.kickoff_datetime` | `matches.kickoff_at` |
+| `groups.edition_id` | `groups.division_id` |
 
 ---
 
-## Architecture (Blueprint Summary)
-```
-Organization (multi-tenant root)
-└── Competition (e.g. Indermark Cup)
-    └── Season (e.g. 2026)
-        ├── Division — U13 League (format: league, age_group: u13)
-        ├── Division — U15 League (format: league, age_group: u15)
-        ├── Division — U17 League (format: league, age_group: u17)
-        └── Division — Open League (format: groups_knockout, age_group: open)
-            ├── Teams (linked via division_id)
-            ├── Groups (linked via division_id)
-            └── Matches (linked via division_id)
-
-Club (persistent football club, linked to organization)
-└── Team (season+division specific, linked to club)
-    └── PlayerRegistration (player linked to team+season+division)
-        └── Player (persistent profile, linked to club)
-```
+## Active Routers (backend/app/routers/)
+| File | Prefix | Status |
+|------|--------|--------|
+| auth.py | /api/auth | ✅ Working |
+| organizations.py | /api/organizations | ✅ Rewritten |
+| competitions.py | /api/competitions | ✅ Rewritten |
+| seasons.py | /api/seasons | ✅ Rewritten |
+| divisions.py | /api/divisions | ✅ Rewritten |
+| clubs.py | /api/clubs | ✅ Rewritten |
+| teams.py | /api/teams | ✅ Rewritten |
+| players.py | /api/players | ✅ Rewritten |
+| matches.py | /api/matches | ✅ Rewritten |
+| match_events.py | /api/match-events | ✅ Rewritten |
+| groups.py | /api/groups | ✅ Rewritten |
+| player_registrations.py | /api/player-registrations | ✅ New |
+| admin.py | /api/admin | ✅ Rewritten |
+| public.py | /api/public | ✅ Rewritten |
 
 ---
 
-## Phase Completion Status
+## Next Session Tasks (Priority Order)
 
-### Phase 1 — Foundation ✅ COMPLETE
-- Organizations, competitions, seasons, clubs
-- Player registrations
-- Memberships (scoped roles)
-- Venues table
-- Fresh database, all migrations run
+### 1. Frontend — update API calls (frontend/src/lib/api.js)
+All API function names and endpoints need updating to match new router URLs and field names.
 
-### Frontend Migration ✅ COMPLETE
-- All API calls updated
-- All admin pages updated
-- Branding updated (PitchBase throughout)
-- Both dashboards working
-- Public pages working
+### 2. Frontend — update all admin pages
+Every admin page references old entity names. Pages to update:
+- Dashboard
+- OrganisationDashboard (was OrganiserDashboard)
+- CompetitionDetail (was TournamentDetail)
+- SeasonDetail (was EditionDetail)
+- DivisionList, NewDivision, EditDivision
+- DivisionTeams — main way to add teams (pick club → creates team in division)
+- DivisionMatches — new division-aware match creation
+- ClubList, NewClub
+- PlayerList — players are now global, searchable
+- MatchDetail — lineups + events
 
-## Current State (as of Session 3 end)
+### 3. Frontend — update public pages
+- CompetitionPage (was TournamentPage)
+- SeasonPage (was EditionPage)
+- MatchPage
 
-### Phase 2 — Core Operations ✅ COMPLETE
-- Divisions router (CRUD, ownership, soft-delete)
-- Standings engine (GET /standings?division_id=...)
-- Teams, Matches, Groups — all updated with division_id
-- Frontend: DivisionList, NewDivision, EditDivision, DivisionStandings pages
-- Frontend: DivisionTeams page — teams added by picking a club, name auto-generated
-- Frontend: ClubList, NewClub pages
-- Competition detail page has Divisions + Discipline links on each season row
-- Dashboard has Clubs and Officials cards
-
-### Phase 3 — Officials, Lineups & Discipline ✅ BACKEND COMPLETE
-- Officials model + router (officials, match_officials)
-- Lineups model + router
-- DisciplinaryAction model + router
-- Migration 003 applied
-- Frontend pages created: MatchDetail (4 sections), OfficialsList, NewOfficial, SeasonDiscipline
-
-### Known Issues / Next Session Tasks
-1. Old EditionTeams page still has manual team name input — needs to be removed
-   (teams are now added through Divisions → Teams using club picker)
-2. Old EditionMatches page still has old match creation form — needs to be 
-   updated to be division-aware (pick division, then home/away team from that division)
-3. MatchDetail page not yet tested — needs a real match to test against
-4. Player registration flow not yet built (players join a club, register to teams per season)
-5. Transfer system not yet built (player moves between clubs)
-
-### Key IDs (test data)
-- Organization: Indermark FC — 94167497-bade-44ee-b906-0e99a16ef115
-- Competition: Indermark Cup
-- Season: Indermark Cup 2026 — 4480f1dc-8a74-4b35-ac09-2b95e8ebd86b
-- Division: U13 Development League
-- Club: All Stars FC
-- Team: All Stars FC U13
-- Test user: admin@pitchbase.co.za / Test1234!
-## Key Business Rules (from Blueprint)
-1. A club can have multiple teams in the same season (different divisions)
-2. A player registers to a team per season — not permanently attached
-3. Registration ≠ Eligibility (future feature)
-4. Standings derive from match results — never manually entered
-5. Development leagues (U13, U15, U17) use pure league format (everyone plays everyone)
-6. Open league uses groups_knockout format
-7. All important changes should eventually be auditable
+### 4. Seed test data
+Once frontend is connected, create:
+- Organization: Indermark FC
+- Competition: Indermark Development League
+- Season: 2026
+- Divisions: U13 League, U15 League, U17 League, Open League
+- Clubs: All Stars FC, Sunrise FC
+- FootballStructure: SAFA → Limpopo → Capricorn Region → Blouberg LFA → Indermark Stream
 
 ---
 
@@ -168,12 +218,3 @@ Club (persistent football club, linked to organization)
 | Frontend routing | `frontend/src/App.js` |
 | Environment config | `backend/.env` |
 
----
-
-## How to Start Each Session
-1. Open VS Code at `C:\Users\bashi\Documents\Football_Tournaments_Hub`
-2. Open PowerShell terminal and run: `& .venv\Scripts\Activate.ps1`
-3. Start backend: `cd backend` then `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
-4. Open a second terminal, start frontend: `cd frontend` then `npm start`
-5. Test health: `Invoke-RestMethod -Uri http://localhost:8000/api/health`
-6. Paste this document at the start of the new chat

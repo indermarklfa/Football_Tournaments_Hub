@@ -25,7 +25,7 @@ export default function DivisionTeams() {
 
       const [divRes, teamsRes, clubsRes] = await Promise.all([
         getDivision(division_id),
-        getTeams(season_id, division_id),
+        getTeams(division_id),
         orgId ? getClubs(orgId) : Promise.resolve({ data: [] }),
       ]);
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getSeason, getTeams, getGroups, createGroup, deleteGroup, addTeamToGroup, removeTeamFromGroup } from '../../lib/api';
 
-export default function EditionGroups() {
+export default function DivisionGroups() {
   const { id } = useParams();
   const [season, setSeason] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -16,10 +16,10 @@ export default function EditionGroups() {
 
   const loadData = async () => {
     try {
-      const [edRes, teamsRes, groupsRes] = await Promise.all([
+      const [seasonRes, teamsRes, groupsRes] = await Promise.all([
         getSeason(id), getTeams(id), getGroups(id)
       ]);
-      setSeason(edRes.data);
+      setSeason(seasonRes.data);
       setTeams(teamsRes.data);
       setGroups(groupsRes.data);
       // Build groupTeams map: { groupId: [teamId, ...] }

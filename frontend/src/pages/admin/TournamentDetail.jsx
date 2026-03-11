@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCompetition, getSeasons, updateCompetition, updateSeason, cloneSeason } from '../../lib/api';
+import { getCompetition, getSeasons, updateCompetition, updateSeason } from '../../lib/api';
 import ImageUpload from '../../components/ImageUpload';
 
 export default function TournamentDetail() {
@@ -10,21 +10,16 @@ export default function TournamentDetail() {
   const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Tournament edit state
+  // Competition edit state
   const [editingCompetition, setEditingCompetition] = useState(false);
-  const [editTournamentName, setEditTournamentName] = useState('');
-  const [editTournamentDesc, setEditTournamentDesc] = useState('');
-  const [editTournamentAgeGroup, setEditTournamentAgeGroup] = useState('');
-  const [editTournamentLogo, setEditTournamentLogo] = useState('');
+  const [editCompetitionName, setEditCompetitionName] = useState('');
+  const [editCompetitionDesc, setEditCompetitionDesc] = useState('');
+  const [editCompetitionAgeGroup, setEditCompetitionAgeGroup] = useState('');
+  const [editCompetitionLogo, setEditCompetitionLogo] = useState('');
 
   // Season edit state
   const [editingSeason, setEditingSeason] = useState(null);
   const [editSeasonForm, setEditSeasonForm] = useState({});
-
-  const [cloningSeason, setCloningSeason] = useState(null);
-  const [cloneForm, setCloneForm] = useState({ name: '', year: '', venue: '', start_date: '', end_date: '' });
-  const [cloneError, setCloneError] = useState('');
-  const [cloning, setCloning] = useState(false);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -35,29 +30,29 @@ export default function TournamentDetail() {
     setLoading(false);
   };
 
-  // --- Tournament actions ---
-  const startEditTournament = () => {
-    setEditTournamentName(competition.name);
-    setEditTournamentDesc(competition.description || '');
-    setEditTournamentAgeGroup(competition.age_group || '');
-    setEditTournamentLogo(competition.logo_url || '');
+  // --- Competition actions ---
+  const startEditCompetition = () => {
+    setEditCompetitionName(competition.name);
+    setEditCompetitionDesc(competition.description || '');
+    setEditCompetitionAgeGroup(competition.age_group || '');
+    setEditCompetitionLogo(competition.logo_url || '');
     setEditingCompetition(true);
   };
 
-  const handleSaveTournament = async () => {
-    await updateCompetition(id, { name: editTournamentName, description: editTournamentDesc, age_group: editTournamentAgeGroup || null, logo_url: editTournamentLogo || null });
+  const handleSaveCompetition = async () => {
+    await updateCompetition(id, { name: editCompetitionName, description: editCompetitionDesc, age_group: editCompetitionAgeGroup || null, logo_url: editCompetitionLogo || null });
     setEditingCompetition(false);
     await loadData();
   };
 
-  const handleDeleteTournament = async () => {
-    if (!window.confirm(`Delete "${competition.name}"? This will permanently delete all its editions, teams, matches and events.`)) return;
+  const handleDeleteCompetition = async () => {
+    if (!window.confirm(`Delete "${competition.name}"? This will permanently delete all its seasons, teams, matches and events.`)) return;
     await updateCompetition(id, { deleted: true });
     navigate('/admin/dashboard');
   };
 
   // --- Season actions ---
-  const startEditEdition = (e) => {
+  const startEditSeason = (e) => {
     setEditingSeason(e.id);
     setEditSeasonForm({
       name: e.name,
@@ -70,7 +65,7 @@ export default function TournamentDetail() {
     });
   };
 
-  const handleSaveEdition = async (seasonId) => {
+  const handleSaveSeason = async (seasonId) => {
     await updateSeason(seasonId, {
       name: editSeasonForm.name,
       year: parseInt(editSeasonForm.year),
@@ -84,44 +79,19 @@ export default function TournamentDetail() {
     await loadData();
   };
 
-  const handleEditionStatus = async (seasonId, status) => {
+  const handleSeasonStatus = async (seasonId, status) => {
     const label = status === 'active' ? 'mark as active' : 'mark as completed';
     if (!window.confirm(`Are you sure you want to ${label}?`)) return;
     await updateSeason(seasonId, { status });
     await loadData();
   };
 
-  const handleDeleteEdition = async (e) => {
+  const handleDeleteSeason = async (e) => {
     if (!window.confirm(`Delete "${e.name}"? This will permanently delete all its teams, matches and events.`)) return;
     await updateSeason(e.id, { deleted: true });
     await loadData();
   };
 
-
-  const handleClone = async () => {
-    if (!cloneForm.name.trim() || !cloneForm.year) {
-      setCloneError('Name and year are required');
-      return;
-    }
-    setCloning(true);
-    setCloneError('');
-    try {
-      const res = await cloneSeason(cloningSeason.id, {
-        name: cloneForm.name,
-        year: parseInt(cloneForm.year),
-        venue: cloneForm.venue || null,
-        start_date: cloneForm.start_date || null,
-        end_date: cloneForm.end_date || null,
-      });
-      setCloningSeason(null);
-      await loadData();
-      alert(`✓ Cloned successfully — ${res.data.teams_cloned} teams and ${res.data.groups_cloned} groups copied with random assignments`);
-    } catch (err) {
-      setCloneError(err.response?.data?.detail || 'Failed to clone edition');
-    } finally {
-      setCloning(false);
-    }
-  };
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
   if (!competition) return <div className="text-center py-12 text-red-400">Competition not found</div>;
@@ -129,23 +99,23 @@ export default function TournamentDetail() {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4" data-testid="tournament-detail">
 
-      {/* Tournament Header */}
+      {/* Competition Header */}
       <Link to="/admin/dashboard" className="text-emerald-400 text-sm hover:underline mb-6 inline-block">← Back to Dashboard</Link>
       <div className="bg-slate-800 rounded-lg p-6 mb-6">
         {editingCompetition ? (
           <div className="space-y-3">
-            <input value={editTournamentName} onChange={(e) => setEditTournamentName(e.target.value)}
+            <input value={editCompetitionName} onChange={(e) => setEditCompetitionName(e.target.value)}
               className="w-full bg-slate-700 text-white px-3 py-2 rounded text-xl font-bold" />
-            <textarea value={editTournamentDesc} onChange={(e) => setEditTournamentDesc(e.target.value)}
+            <textarea value={editCompetitionDesc} onChange={(e) => setEditCompetitionDesc(e.target.value)}
               placeholder="Description" rows={2}
               className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
             <ImageUpload
-              currentUrl={editTournamentLogo}
-              onUpload={(url) => setEditTournamentLogo(url)}
-              label="Tournament Logo"
+              currentUrl={editCompetitionLogo}
+              onUpload={(url) => setEditCompetitionLogo(url)}
+              label="Competition Logo"
               size="md"
             />
-            <select value={editTournamentAgeGroup} onChange={(e) => setEditTournamentAgeGroup(e.target.value)}
+            <select value={editCompetitionAgeGroup} onChange={(e) => setEditCompetitionAgeGroup(e.target.value)}
               className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm">
               <option value="">None / Open</option>
               <option value="U9">U9</option>
@@ -159,7 +129,7 @@ export default function TournamentDetail() {
               <option value="Veterans">Veterans</option>
             </select>
             <div className="flex gap-2">
-              <button onClick={handleSaveTournament}
+              <button onClick={handleSaveCompetition}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-sm">Save</button>
               <button onClick={() => setEditingCompetition(false)}
                 className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-1.5 rounded text-sm">Cancel</button>
@@ -186,16 +156,16 @@ export default function TournamentDetail() {
             </div>
             </div>
             <div className="flex gap-2 ml-4">
-              <button onClick={startEditTournament}
+              <button onClick={startEditCompetition}
                 className="text-emerald-400 hover:text-emerald-300 text-sm">Edit</button>
-              <button onClick={handleDeleteTournament}
+              <button onClick={handleDeleteCompetition}
                 className="text-red-400 hover:text-red-300 text-sm">Delete</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Editions */}
+      {/* Seasons */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-white">Seasons</h2>
         <Link to={`/admin/seasons/new?competition_id=${id}`}
@@ -210,7 +180,7 @@ export default function TournamentDetail() {
           {seasons.map((e) => (
             <div key={e.id} className="bg-slate-800 rounded-lg" data-testid={`edition-${e.id}`}>
               {editingSeason === e.id ? (
-                // Edition inline edit form
+                // Season inline edit form
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -268,14 +238,14 @@ export default function TournamentDetail() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleSaveEdition(e.id)}
+                    <button onClick={() => handleSaveSeason(e.id)}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-sm">Save</button>
                     <button onClick={() => setEditingSeason(null)}
                       className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-1.5 rounded text-sm">Cancel</button>
                   </div>
                 </div>
               ) : (
-                // Edition display row
+                // Season display row
                 <div className="flex items-center justify-between p-4">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -291,18 +261,18 @@ export default function TournamentDetail() {
                   </div>
                   <div className="flex items-center gap-3 ml-4 flex-wrap justify-end">
                     {e.status === 'upcoming' && (
-                      <button onClick={() => handleEditionStatus(e.id, 'active')}
+                      <button onClick={() => handleSeasonStatus(e.id, 'active')}
                         className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded">
                         Mark Active
                       </button>
                     )}
                     {e.status === 'active' && (
-                      <button onClick={() => handleEditionStatus(e.id, 'completed')}
+                      <button onClick={() => handleSeasonStatus(e.id, 'completed')}
                         className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded">
                         Mark Completed
                       </button>
                     )}
-                    <button onClick={() => startEditEdition(e)}
+                    <button onClick={() => startEditSeason(e)}
                       className="text-emerald-400 hover:text-emerald-300 text-sm">Edit</button>
                     <Link to={`/admin/seasons/${e.id}/teams`}
                       className="text-emerald-400 hover:underline text-sm">Teams</Link>
@@ -312,82 +282,13 @@ export default function TournamentDetail() {
                       className="text-emerald-400 hover:underline text-sm">Matches</Link>
                     <Link to={`/admin/seasons/${e.id}/discipline`}
                       className="text-emerald-400 hover:underline text-sm">Discipline</Link>
-                    <button onClick={() => {
-                      setCloningSeason(e);
-                      setCloneForm({ name: `${e.name} (Copy)`, year: new Date().getFullYear() + 1, venue: e.venue || '', start_date: '', end_date: '' });
-                      setCloneError('');
-                    }}
-                      className="text-slate-400 hover:text-white text-sm">Clone</button>
-                    <button onClick={() => handleDeleteEdition(e)}
+                    <button onClick={() => handleDeleteSeason(e)}
                       className="text-red-400 hover:text-red-300 text-sm">Delete</button>
                   </div>
                 </div>
               )}
             </div>
           ))}
-        </div>
-      )}
-      {/* Clone modal */}
-      {cloningSeason && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-white font-semibold mb-1">Clone Season</h2>
-            <p className="text-slate-400 text-sm mb-4">
-              Cloning: <span className="text-white">{cloningSeason.name}</span>
-              <br />
-              <span className="text-xs text-slate-500">Teams and groups will be copied. Team assignments will be randomised. No matches will be copied.</span>
-            </p>
-            {cloneError && <div className="bg-red-900/50 text-red-300 text-sm p-2 rounded mb-3">{cloneError}</div>}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">New Name *</label>
-                  <input value={cloneForm.name}
-                    onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
-                    placeholder="e.g. Wizzo Cup 2026"
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Year *</label>
-                  <input type="number" value={cloneForm.year}
-                    onChange={(e) => setCloneForm({ ...cloneForm, year: e.target.value })}
-                    placeholder="2026"
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-slate-300 text-sm mb-1">Venue</label>
-                <input value={cloneForm.venue}
-                  onChange={(e) => setCloneForm({ ...cloneForm, venue: e.target.value })}
-                  placeholder={cloningSeason.venue || 'Same as original'}
-                  className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Start Date</label>
-                  <input type="date" value={cloneForm.start_date}
-                    onChange={(e) => setCloneForm({ ...cloneForm, start_date: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">End Date</label>
-                  <input type="date" value={cloneForm.end_date}
-                    onChange={(e) => setCloneForm({ ...cloneForm, end_date: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={handleClone} disabled={cloning}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm">
-                {cloning ? 'Cloning...' : 'Clone Season'}
-              </button>
-              <button onClick={() => { setCloningSeason(null); setCloneError(''); }}
-                className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

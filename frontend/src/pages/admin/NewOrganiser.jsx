@@ -17,7 +17,7 @@ export default function NewOrganiser() {
       await createOrganization({ name, description: description || null, location: location || null });
       navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create organiser');
+      setError(err.response?.data?.detail || 'Failed to create organization');
     } finally {
       setLoading(false);
     }

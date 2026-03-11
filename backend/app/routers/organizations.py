@@ -1,5 +1,4 @@
 """Organizations router"""
-import re
 from uuid import UUID
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,30 +8,24 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import User, Organization, Membership, MembershipRole
+from app.models import User, UserRole, Organization, Membership
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
-def slugify(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"[\s_]+", "-", text)
-    text = re.sub(r"-+", "-", text)
-    return text.strip("-")
-
-
-async def get_org_with_membership(db: AsyncSession, org_id: UUID, user: User) -> Organization:
-    result = await db.execute(
-        select(Organization)
-        .join(Membership, Membership.organization_id == Organization.id)
-        .where(
-            Organization.id == org_id,
-            Organization.deleted_at.is_(None),
-            Membership.user_id == user.id,
-            Membership.is_active == True,
+async def get_org_with_ownership(db: AsyncSession, org_id: UUID, user: User) -> Organization:
+    if user.role == UserRole.ADMIN:
+        result = await db.execute(
+            select(Organization).where(Organization.id == org_id, Organization.deleted_at.is_(None))
         )
-    )
+    else:
+        result = await db.execute(
+            select(Organization).where(
+                Organization.id == org_id,
+                Organization.owner_user_id == user.id,
+                Organization.deleted_at.is_(None),
+            )
+        )
     org = result.scalar_one_or_none()
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
@@ -41,39 +34,24 @@ async def get_org_with_membership(db: AsyncSession, org_id: UUID, user: User) ->
 
 class OrganizationCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    city: Optional[str] = None
-    province: Optional[str] = None
-    country: str = "South Africa"
-    logo_url: Optional[str] = None
-    banner_url: Optional[str] = None
-    website_url: Optional[str] = None
+    short_name: Optional[str] = None
+    organization_type: Optional[str] = None
 
 
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
-    city: Optional[str] = None
-    province: Optional[str] = None
-    logo_url: Optional[str] = None
-    banner_url: Optional[str] = None
-    website_url: Optional[str] = None
-    deleted: Optional[bool] = None
+    short_name: Optional[str] = None
+    organization_type: Optional[str] = None
+    status: Optional[str] = None
 
 
 class OrganizationResponse(BaseModel):
     id: UUID
-    created_by_user_id: UUID
     name: str
-    slug: Optional[str]
-    description: Optional[str]
-    city: Optional[str]
-    province: Optional[str]
-    country: str
-    logo_url: Optional[str]
-    banner_url: Optional[str]
-    website_url: Optional[str]
-    is_active: bool
+    short_name: Optional[str]
+    organization_type: Optional[str]
+    owner_user_id: UUID
+    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -88,26 +66,15 @@ async def create_organization(
     user: User = Depends(get_current_user),
 ):
     org = Organization(
-        created_by_user_id=user.id,
         name=req.name,
-        slug=slugify(req.name),
-        description=req.description,
-        city=req.city,
-        province=req.province,
-        country=req.country,
-        logo_url=req.logo_url,
-        banner_url=req.banner_url,
-        website_url=req.website_url,
+        short_name=req.short_name,
+        organization_type=req.organization_type,
+        owner_user_id=user.id,
+        status="active",
     )
     db.add(org)
     await db.flush()
-
-    membership = Membership(
-        user_id=user.id,
-        organization_id=org.id,
-        role=MembershipRole.ORG_OWNER,
-        granted_by=user.id,
-    )
+    membership = Membership(user_id=user.id, organization_id=org.id, role="owner")
     db.add(membership)
     await db.commit()
     await db.refresh(org)
@@ -119,17 +86,16 @@ async def list_organizations(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Organization)
-        .join(Membership, Membership.organization_id == Organization.id)
-        .where(
-            Organization.deleted_at.is_(None),
-            Membership.user_id == user.id,
-            Membership.is_active == True,
+    if user.role == UserRole.ADMIN:
+        result = await db.execute(
+            select(Organization).where(Organization.deleted_at.is_(None)).order_by(Organization.name)
         )
-        .distinct()
-        .order_by(Organization.name.asc())
-    )
+    else:
+        result = await db.execute(
+            select(Organization)
+            .where(Organization.owner_user_id == user.id, Organization.deleted_at.is_(None))
+            .order_by(Organization.name)
+        )
     return result.scalars().all()
 
 
@@ -139,7 +105,7 @@ async def get_organization(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await get_org_with_membership(db, id, user)
+    return await get_org_with_ownership(db, id, user)
 
 
 @router.patch("/{id}", response_model=OrganizationResponse)
@@ -149,18 +115,23 @@ async def update_organization(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    org = await get_org_with_membership(db, id, user)
+    org = await get_org_with_ownership(db, id, user)
     data = req.model_dump(exclude_unset=True)
-
-    if data.pop("deleted", None):
-        org.deleted_at = datetime.now(timezone.utc)
-    else:
-        for k, v in data.items():
-            setattr(org, k, v)
-        if "name" in data and data["name"]:
-            org.slug = slugify(data["name"])
-
+    for k, v in data.items():
+        setattr(org, k, v)
     org.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(org)
     return org
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_organization(
+    id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    org = await get_org_with_ownership(db, id, user)
+    org.deleted_at = datetime.now(timezone.utc)
+    org.updated_at = datetime.now(timezone.utc)
+    await db.commit()

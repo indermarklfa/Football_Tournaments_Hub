@@ -6,17 +6,17 @@ const AGE_GROUPS = ['U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'U21', 'Senior', 'V
 
 export default function Home() {
   const [query, setQuery] = useState('');
-  const [tournaments, setTournaments] = useState([]);
-  const [allTournaments, setAllTournaments] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [allCompetitions, setAllCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     searchCompetitions('').then((res) => {
-      setTournaments(res.data);
-      setAllTournaments(res.data);
+      setCompetitions(res.data);
+      setAllCompetitions(res.data);
       setLoading(false);
     }).catch(() => {
-      setTournaments([]);
+      setCompetitions([]);
       setLoading(false);
     });
   }, []);
@@ -25,9 +25,9 @@ export default function Home() {
     setLoading(true);
     try {
       const res = await searchCompetitions(q);
-      setTournaments(res.data);
+      setCompetitions(res.data);
     } catch {
-      setTournaments([]);
+      setCompetitions([]);
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ export default function Home() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tournaments..."
+              placeholder="Search competitions..."
               className="flex-1 bg-slate-800/80 backdrop-blur text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 border border-slate-700/50 min-w-0 placeholder-slate-500"
               data-testid="search-input"
             />
@@ -110,24 +110,24 @@ export default function Home() {
       </div>
 
       {/* ── STATS BAR ── */}
-      {allTournaments.length > 0 && (
+      {allCompetitions.length > 0 && (
         <div className="border-y border-slate-800 bg-slate-900/50">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-center gap-8">
             <div className="text-center">
-              <p className="text-emerald-400 font-bold text-lg leading-none">{allTournaments.length}</p>
+              <p className="text-emerald-400 font-bold text-lg leading-none">{allCompetitions.length}</p>
               <p className="text-slate-500 text-xs mt-0.5">Competitions</p>
             </div>
             <div className="w-px h-8 bg-slate-700" />
             <div className="text-center">
               <p className="text-emerald-400 font-bold text-lg leading-none">
-                {new Set(allTournaments.map(t => t.organiser_name).filter(Boolean)).size}
+                {new Set(allCompetitions.map(t => t.organiser_name).filter(Boolean)).size}
               </p>
               <p className="text-slate-500 text-xs mt-0.5">Organizations</p>
             </div>
             <div className="w-px h-8 bg-slate-700" />
             <div className="text-center">
               <p className="text-emerald-400 font-bold text-lg leading-none">
-                {new Set(allTournaments.flatMap(t => t.age_group ? [t.age_group] : [])).size}
+                {new Set(allCompetitions.flatMap(t => t.age_group ? [t.age_group] : [])).size}
               </p>
               <p className="text-slate-500 text-xs mt-0.5">Age Groups</p>
             </div>
@@ -137,19 +137,19 @@ export default function Home() {
 
       {/* ── TOURNAMENT LIST ── */}
       <div className="max-w-3xl mx-auto px-4 py-6">
-        {!loading && tournaments.length > 0 && (
+        {!loading && competitions.length > 0 && (
           <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
-            {tournaments.length} Competition{tournaments.length !== 1 ? 's' : ''}
+            {competitions.length} Competition{competitions.length !== 1 ? 's' : ''}
           </p>
         )}
 
         {loading ? (
           <div className="text-center text-slate-500 py-12">Loading...</div>
-        ) : tournaments.length === 0 ? (
+        ) : competitions.length === 0 ? (
           <div className="text-center text-slate-500 py-12">No competitions found</div>
         ) : (
           <div className="space-y-3">
-            {tournaments.map((t) => (
+            {competitions.map((t) => (
               <Link
                 key={t.id}
                 to={`/competitions/${t.id}`}

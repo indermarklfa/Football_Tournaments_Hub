@@ -78,7 +78,7 @@ export default function MatchPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4" data-testid="match-page">
-      <Link to={`/editions/${match.edition_id}`} className="text-emerald-400 text-sm hover:underline">
+      <Link to={`/seasons/${match.season_id}`} className="text-emerald-400 text-sm hover:underline">
         ← Back to Fixtures
       </Link>
 
@@ -111,13 +111,13 @@ export default function MatchPage() {
             {match.status === 'scheduled' ? (
               <>
                 <p className="text-3xl font-bold text-white">
-                  {match.kickoff_datetime
-                    ? new Date(match.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                  {match.kickoff_at
+                    ? new Date(match.kickoff_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                     : 'TBC'}
                 </p>
-                {match.kickoff_datetime && (
+                {match.kickoff_at && (
                   <p className="text-slate-500 text-xs mt-1">
-                    {new Date(match.kickoff_datetime).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {new Date(match.kickoff_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                   </p>
                 )}
               </>

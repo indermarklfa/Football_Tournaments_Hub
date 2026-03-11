@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPublicSeason, getPublicFixtures, getPublicTeams, getPublicTopScorers, getPublicDiscipline, getPublicPlayers, getPublicStandings } from '../../lib/api';
+import { getPublicSeason, getPublicFixtures, getPublicTeams, getPublicTopScorers, getPublicPlayers, getPublicStandings } from '../../lib/api';
 
-export default function EditionPage() {
+export default function SeasonPage() {
   const { id } = useParams();
-  const [edition, setEdition] = useState(null);
+  const [season, setSeason] = useState(null);
   const [fixtures, setFixtures] = useState([]);
   const [teams, setTeams] = useState([]);
   const [topScorers, setTopScorers] = useState([]);
-  const [discipline, setDiscipline] = useState([]);
   const [standings, setStandings] = useState([]);
   const [tab, setTab] = useState('fixtures');
   const [loading, setLoading] = useState(true);
@@ -23,14 +22,12 @@ export default function EditionPage() {
       getPublicFixtures(id),
       getPublicTeams(id),
       getPublicTopScorers(id),
-      getPublicDiscipline(id),
       getPublicStandings(id),
-    ]).then(([edRes, fixRes, teamsRes, scorersRes, discRes, standingsRes]) => {
-      setEdition(edRes.data);
+    ]).then(([seasonRes, fixRes, teamsRes, scorersRes, standingsRes]) => {
+      setSeason(seasonRes.data);
       setFixtures(fixRes.data);
       setTeams(teamsRes.data);
       setTopScorers(scorersRes.data);
-      setDiscipline(discRes.data);
       setStandings(standingsRes.data);
     }).finally(() => setLoading(false));
   }, [id]);
@@ -47,10 +44,10 @@ export default function EditionPage() {
   };
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
-  if (!edition) return <div className="text-center py-12 text-red-400">Edition not found</div>;
+  if (!season) return <div className="text-center py-12 text-red-400">Season not found</div>;
 
-  const showBracket = ['knockout', 'groups_knockout'].includes(edition?.format);
-  const showStandings = ['groups_knockout', 'league'].includes(edition?.format);
+  const showBracket = ['knockout', 'groups_knockout'].includes(season?.format);
+  const showStandings = ['groups_knockout', 'league'].includes(season?.format);
 
   const tabs = [
     { id: 'fixtures', label: 'Fixtures' },
@@ -80,23 +77,23 @@ export default function EditionPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-emerald-500/8 rounded-full blur-3xl" />
 
         <div className="relative max-w-5xl mx-auto px-4 pt-5 pb-8">
-          <Link to={`/competitions/${edition.tournament_id}`}
+          <Link to={`/competitions/${season.competition_id}`}
             className="text-slate-500 hover:text-emerald-400 text-sm transition-colors">
-            ← Back to {edition.tournament_name}
+            ← Back to {season.competition_name}
           </Link>
 
           <div className="flex items-center gap-4 mt-5">
             {/* Logo */}
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl shrink-0 overflow-hidden border-2 border-slate-700 bg-slate-800 flex items-center justify-center shadow-xl shadow-black/40">
-              {edition.tournament_logo_url ? (
+              {season.competition_logo_url ? (
                 <img
-                  src={edition.tournament_logo_url.startsWith('http') ? edition.tournament_logo_url : `http://localhost:8000${edition.tournament_logo_url}`}
-                  alt={edition.tournament_name}
+                  src={season.competition_logo_url.startsWith('http') ? season.competition_logo_url : `http://localhost:8000${season.competition_logo_url}`}
+                  alt={season.competition_name}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-emerald-400 font-black text-2xl">
-                  {edition.tournament_name?.[0]}
+                  {season.competition_name?.[0]}
                 </span>
               )}
             </div>
@@ -104,29 +101,29 @@ export default function EditionPage() {
             {/* Title */}
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight tracking-tight">
-                {edition.name}
+                {season.name}
               </h1>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-                  edition.status === 'active'
+                  season.status === 'active'
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                    : edition.status === 'upcoming'
+                    : season.status === 'upcoming'
                     ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                     : 'bg-slate-700/50 text-slate-400 border-slate-600/30'
                 }`}>
-                  {edition.status === 'active' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5 mb-px" />}
-                  {edition.status}
+                  {season.status === 'active' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5 mb-px" />}
+                  {season.status}
                 </span>
-                {edition.venue && (
-                  <span className="text-slate-500 text-xs">📍 {edition.venue}</span>
+                {season.venue && (
+                  <span className="text-slate-500 text-xs">📍 {season.venue}</span>
                 )}
-                {edition.start_date && (
+                {season.start_date && (
                   <span className="text-slate-500 text-xs">
-                    📅 {edition.start_date}{edition.end_date ? ` – ${edition.end_date}` : ''}
+                    📅 {season.start_date}{season.end_date ? ` – ${season.end_date}` : ''}
                   </span>
                 )}
                 <span className="text-slate-600 text-xs capitalize">
-                  {edition.format?.replace(/_/g, ' ')}
+                  {season.format?.replace(/_/g, ' ')}
                 </span>
               </div>
             </div>
@@ -259,7 +256,7 @@ export default function EditionPage() {
         };
 
         const MatchCard = ({ m, showDate = false }) => {
-          const kickoff = formatKickoff(m.kickoff_datetime);
+          const kickoff = formatKickoff(m.kickoff_at);
           const isKnockout = m.stage !== 'group';
 
           const centerContent = () => {
@@ -349,7 +346,7 @@ export default function EditionPage() {
                 {matchdays.map(matchday => {
                   const dayMatches = groupMatches.filter(m => m.matchday === matchday);
                   // Get date for this matchday if available
-                  const firstDate = dayMatches.find(m => m.kickoff_datetime)?.kickoff_datetime;
+                  const firstDate = dayMatches.find(m => m.kickoff_at)?.kickoff_at;
                   const dateLabel = firstDate
                     ? new Date(firstDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
                     : null;
@@ -497,7 +494,7 @@ export default function EditionPage() {
                             <span className="text-emerald-400 font-mono text-sm w-7 text-center shrink-0">
                               {p.jersey_number ? `#${p.jersey_number}` : '—'}
                             </span>
-                            <span className="text-white text-sm flex-1">{p.name}</span>
+                            <span className="text-white text-sm flex-1">{p.first_name} {p.last_name}</span>
                             <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded">{posShort}</span>
                           </div>
                         ))}
@@ -515,7 +512,7 @@ export default function EditionPage() {
                           <span className="text-emerald-400 font-mono text-sm w-7 text-center shrink-0">
                             {p.jersey_number ? `#${p.jersey_number}` : '—'}
                           </span>
-                          <span className="text-white text-sm flex-1">{p.name}</span>
+                          <span className="text-white text-sm flex-1">{p.first_name} {p.last_name}</span>
                         </div>
                       ))}
                     </div>
@@ -884,36 +881,7 @@ export default function EditionPage() {
 
       {/* DISCIPLINE TAB */}
       {tab === 'discipline' && (
-        <div className="bg-slate-800 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-slate-700">
-              <tr>
-                <th className="text-left px-3 py-2.5 text-slate-300 text-xs">Player</th>
-                <th className="text-left px-3 py-2.5 text-slate-300 text-xs hidden sm:table-cell">Team</th>
-                <th className="text-center px-3 py-2.5 text-yellow-400 text-xs">🟨</th>
-                <th className="text-center px-3 py-2.5 text-red-400 text-xs">🟥</th>
-                <th className="text-center px-3 py-2.5 text-slate-300 text-xs">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {discipline.map((d) => (
-                <tr key={d.player_id} className="border-t border-slate-700" data-testid={`discipline-${d.player_id}`}>
-                  <td className="px-3 py-2.5">
-                    <p className="text-white text-sm">{d.player_name}</p>
-                    <p className="text-slate-500 text-xs sm:hidden">{d.team_name}</p>
-                  </td>
-                  <td className="px-3 py-2.5 text-slate-400 text-sm hidden sm:table-cell">{d.team_name}</td>
-                  <td className="px-3 py-2.5 text-center text-yellow-400 font-medium">{d.yellow_cards}</td>
-                  <td className="px-3 py-2.5 text-center text-red-400 font-medium">{d.red_cards}</td>
-                  <td className="px-3 py-2.5 text-center text-white font-bold">{d.total}</td>
-                </tr>
-              ))}
-              {discipline.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-8 text-slate-500">No cards recorded yet</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <p className="text-slate-500 text-center py-8">Discipline data coming soon</p>
       )}
     </div>
     </div>

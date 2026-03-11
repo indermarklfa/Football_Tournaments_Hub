@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getDivision, getStandings } from '../../lib/api';
+import { getDivision, getPublicStandings } from '../../lib/api';
 
 export default function DivisionStandings() {
   const { division_id } = useParams();
@@ -15,7 +15,7 @@ export default function DivisionStandings() {
     try {
       const [divRes, standingsRes] = await Promise.all([
         getDivision(division_id),
-        getStandings(division_id),
+        getPublicStandings(division_id),
       ]);
       setDivision(divRes.data);
       setRows(standingsRes.data);

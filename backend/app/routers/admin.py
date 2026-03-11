@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db import get_db
-from app.models import User, UserRole, Organization, Competition
+from app.models import User, UserRole, Organization, Competition, Membership
 from app.deps import get_current_user
 from app.security import hash_password
 from app.schemas.auth import UserResponse
@@ -25,8 +25,8 @@ class CreateOrganiserUserRequest(BaseModel):
     email: EmailStr
     password: str
     organiser_name: str
-    organiser_location: Optional[str] = None
-    organiser_description: Optional[str] = None
+    short_name: Optional[str] = None
+    organization_type: Optional[str] = None
 
 
 class OrganiserUserResponse(BaseModel):
@@ -34,7 +34,6 @@ class OrganiserUserResponse(BaseModel):
     email: str
     organiser_id: UUID
     organiser_name: str
-    organiser_location: Optional[str]
     created_at: datetime
 
     class Config:
@@ -44,9 +43,8 @@ class OrganiserUserResponse(BaseModel):
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """List all users"""
     result = await db.execute(
         select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
     )
@@ -57,17 +55,14 @@ async def list_users(
 async def create_organiser_account(
     req: CreateOrganiserUserRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """Create a new organiser user + their organization profile in one step"""
-    # Check email not taken
     existing = await db.execute(
         select(User).where(User.email == req.email, User.deleted_at.is_(None))
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create user
     user = User(
         email=req.email,
         password_hash=hash_password(req.password),
@@ -76,14 +71,18 @@ async def create_organiser_account(
     db.add(user)
     await db.flush()
 
-    # Create their organization profile
     org = Organization(
-        created_by_user_id=user.id,
+        owner_user_id=user.id,
         name=req.organiser_name,
-        location=req.organiser_location,
-        description=req.organiser_description,
+        short_name=req.short_name,
+        organization_type=req.organization_type,
+        status="active",
     )
     db.add(org)
+    await db.flush()
+
+    membership = Membership(user_id=user.id, organization_id=org.id, role="owner")
+    db.add(membership)
     await db.commit()
     await db.refresh(user)
     await db.refresh(org)
@@ -93,7 +92,6 @@ async def create_organiser_account(
         email=user.email,
         organiser_id=org.id,
         organiser_name=org.name,
-        organiser_location=org.location,
         created_at=user.created_at,
     )
 
@@ -101,13 +99,12 @@ async def create_organiser_account(
 @router.get("/organiser-accounts", response_model=list[OrganiserUserResponse])
 async def list_organiser_accounts(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """List all organiser users with their organization profile"""
     result = await db.execute(
         select(User, Organization)
-        .join(Organization, Organization.created_by_user_id == User.id)
-        .where(User.deleted_at.is_(None), User.role == UserRole.ORGANISER)
+        .join(Organization, Organization.owner_user_id == User.id)
+        .where(User.deleted_at.is_(None), User.role == UserRole.ORGANISER, Organization.deleted_at.is_(None))
         .order_by(User.created_at.desc())
     )
     rows = result.all()
@@ -117,7 +114,6 @@ async def list_organiser_accounts(
             email=row.User.email,
             organiser_id=row.Organization.id,
             organiser_name=row.Organization.name,
-            organiser_location=row.Organization.location,
             created_at=row.User.created_at,
         )
         for row in rows
@@ -128,9 +124,8 @@ async def list_organiser_accounts(
 async def delete_organiser_account(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """Soft delete an organiser account"""
     result = await db.execute(
         select(User).where(User.id == user_id, User.deleted_at.is_(None))
     )
@@ -146,11 +141,10 @@ async def delete_organiser_account(
 @router.get("/competitions")
 async def list_all_competitions(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """List all competitions across all organizations"""
     result = await db.execute(
-        select(Competition, Organization.name.label("organiser_name"))
+        select(Competition, Organization.name.label("org_name"))
         .join(Organization)
         .where(Competition.deleted_at.is_(None))
         .order_by(Organization.name.asc(), Competition.name.asc())
@@ -160,20 +154,21 @@ async def list_all_competitions(
         {
             "id": str(row.Competition.id),
             "name": row.Competition.name,
-            "description": row.Competition.description,
-            "organiser_name": row.organiser_name,
+            "competition_type": row.Competition.competition_type,
+            "scope_level": row.Competition.scope_level,
+            "org_name": row.org_name,
         }
         for row in rows
     ]
+
 
 @router.patch("/competitions/{competition_id}/move")
 async def move_competition(
     competition_id: UUID,
     data: dict,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
-    """Move a competition to a different organization"""
     result = await db.execute(
         select(Competition).where(Competition.id == competition_id, Competition.deleted_at.is_(None))
     )
@@ -181,30 +176,31 @@ async def move_competition(
     if not competition:
         raise HTTPException(status_code=404, detail="Competition not found")
 
-    new_organiser_id = data.get("organiser_id")
-    if not new_organiser_id:
-        raise HTTPException(status_code=400, detail="organiser_id required")
+    new_org_id = data.get("organization_id")
+    if not new_org_id:
+        raise HTTPException(status_code=400, detail="organization_id required")
 
-    # Verify new organization exists
     org_result = await db.execute(
-        select(Organization).where(Organization.id == UUID(new_organiser_id), Organization.deleted_at.is_(None))
+        select(Organization).where(Organization.id == UUID(new_org_id), Organization.deleted_at.is_(None))
     )
     if not org_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    competition.organization_id = UUID(new_organiser_id)
+    competition.organization_id = UUID(new_org_id)
     await db.commit()
     return {"success": True}
 
+
 class ResetPasswordRequest(BaseModel):
     new_password: str
+
 
 @router.post("/organiser-accounts/{user_id}/reset-password")
 async def reset_organiser_password(
     user_id: UUID,
     req: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
     result = await db.execute(
         select(User).where(User.id == user_id, User.deleted_at.is_(None))

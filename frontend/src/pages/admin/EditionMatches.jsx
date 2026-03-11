@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSeason, getTeams, getAliveTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch, generateGroupFixtures, bulkUpdateMatches } from '../../lib/api';
+import { getSeason, getTeams, getGroups, getMatches, createMatch, updateMatch, deleteMatch, generateGroupFixtures, bulkUpdateMatches } from '../../lib/api';
 
 const STAGES = ['group', 'round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
 const STATUSES = ['scheduled', 'live', 'completed', 'postponed', 'cancelled'];
 
-export default function EditionMatches() {
+export default function DivisionMatches() {
   const { id } = useParams();
   const [season, setSeason] = useState(null);
   const [teams, setTeams] = useState([]);
   const [groups, setGroups] = useState([]);
   const [matches, setMatches] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [aliveTeams, setAliveTeams] = useState([]);
   const [filter, setFilter] = useState('all');
   const [editingMatch, setEditingMatch] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -38,10 +37,10 @@ export default function EditionMatches() {
   useEffect(() => { loadData(); }, [id]);
 
   const loadData = async () => {
-    const [edRes, teamsRes, matchesRes, groupsRes] = await Promise.all([
+    const [seasonRes, teamsRes, matchesRes, groupsRes] = await Promise.all([
       getSeason(id), getTeams(id), getMatches(id), getGroups(id)
     ]);
-    setSeason(edRes.data);
+    setSeason(seasonRes.data);
     setTeams(teamsRes.data);
     setMatches(matchesRes.data);
     setGroups(groupsRes.data);
@@ -68,7 +67,7 @@ export default function EditionMatches() {
     const data = {};
     matches.filter(m => m.stage === 'group').forEach(m => {
       data[m.id] = {
-        kickoff: m.kickoff_datetime ? m.kickoff_datetime.slice(0, 16) : '',
+        kickoff: m.kickoff_at ? m.kickoff_at.slice(0, 16) : '',
         venue: m.venue || '',
       };
     });
@@ -81,7 +80,7 @@ export default function EditionMatches() {
     try {
       const payload = Object.entries(scheduleData).map(([id, vals]) => ({
         id,
-        kickoff_datetime: vals.kickoff || null,
+        kickoff_at: vals.kickoff || null,
         venue: vals.venue || null,
       }));
       const res = await bulkUpdateMatches({ matches: payload });
@@ -101,7 +100,7 @@ export default function EditionMatches() {
       away_team_id: form.awayTeamId,
       stage: form.stage,
       group_id: form.groupId || null,
-      kickoff_datetime: form.kickoff || null,
+      kickoff_at: form.kickoff || null,
       venue: form.venue || null,
     });
     setShowForm(false);
@@ -116,7 +115,7 @@ export default function EditionMatches() {
       awayTeamId: m.away_team_id,
       stage: m.stage,
       groupId: m.group_id || '',
-      kickoff: m.kickoff_datetime ? m.kickoff_datetime.slice(0, 16) : '',
+      kickoff: m.kickoff_at ? m.kickoff_at.slice(0, 16) : '',
       venue: m.venue || '',
       status: m.status,
       homePenalties: m.home_penalties ?? '',
@@ -130,7 +129,7 @@ export default function EditionMatches() {
       away_team_id: editForm.awayTeamId,
       stage: editForm.stage,
       group_id: editForm.groupId || null,
-      kickoff_datetime: editForm.kickoff || null,
+      kickoff_at: editForm.kickoff || null,
       venue: editForm.venue || null,
       status: editForm.status,
       home_penalties: editForm.homePenalties !== '' ? parseInt(editForm.homePenalties) : null,
@@ -163,9 +162,9 @@ export default function EditionMatches() {
     : STAGES;    // groups_knockout gets all stages
 
   // Group dropdown only relevant when stage is 'group' and format supports groups
-  const showGroupSelect = (stage) => 
-    stage === 'group' && 
-    groups.length > 0 && 
+  const showGroupSelect = (stage) =>
+    stage === 'group' &&
+    groups.length > 0 &&
     ['groups_knockout', 'league'].includes(season?.format);
 
   // Teams filtered to only those in the selected group
@@ -181,14 +180,12 @@ export default function EditionMatches() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">{season?.name} - Matches</h1>
-          <Link to={`/admin/seasons/${id}/teams`} className="text-emerald-400 text-sm hover:underline">← Back to Teams</Link>
+          <Link to={`/admin/competitions/${season?.competition_id}`} className="text-emerald-400 text-sm hover:underline">← Back to Competition</Link>
         </div>
-        <button onClick={async () => {
+        <button onClick={() => {
           const next = !showForm;
           setShowForm(next);
           if (next) {
-            const res = await getAliveTeams(id);
-            setAliveTeams(res.data);
             setForm(f => ({ ...f, venue: season?.venue || '', stage: defaultStage() }));
           }
         }}
@@ -199,7 +196,7 @@ export default function EditionMatches() {
       {/* Groups warning */}
       {season?.format === 'groups_knockout' && groups.length === 0 && (
         <div className="bg-amber-900/30 border border-amber-700 text-amber-300 p-4 rounded-lg mb-6 flex items-center justify-between">
-          <span className="text-sm">⚠ This is a Groups + Knockout edition but no groups have been set up yet.</span>
+          <span className="text-sm">⚠ This is a Groups + Knockout division but no groups have been set up yet.</span>
           <Link to={`/admin/seasons/${id}/groups`}
             className="bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm ml-4 whitespace-nowrap">
             Set Up Groups →
@@ -207,7 +204,7 @@ export default function EditionMatches() {
         </div>
       )}
 
-      
+
       {/* Generate fixtures button — shown when groups exist and no group matches yet */}
       {['groups_knockout', 'league'].includes(season?.format) && groups.length > 0 && !matches.some(m => m.stage === 'group') && (
         <div className="bg-slate-800 border border-slate-700 p-4 rounded-lg mb-6 flex items-center justify-between">
@@ -380,7 +377,7 @@ export default function EditionMatches() {
                 <option value="">Select</option>
                 {(form.stage === 'group' && form.groupId
                   ? teamsForGroup(form.groupId)
-                  : aliveTeams.length > 0 ? aliveTeams : teams
+                  : teams
                 ).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
@@ -391,7 +388,7 @@ export default function EditionMatches() {
                 <option value="">Select</option>
                 {(form.stage === 'group' && form.groupId
                   ? teamsForGroup(form.groupId)
-                  : aliveTeams.length > 0 ? aliveTeams : teams
+                  : teams
                 ).filter(t => t.id !== form.homeTeamId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
@@ -454,7 +451,7 @@ export default function EditionMatches() {
         const STATUS_ORDER = { live: 0, penalties: 1, scheduled: 2, completed: 3, postponed: 4, cancelled: 5 };
         const STAGE_ORDER = ['group', 'round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
 
-        const kickoffMs = (m) => m.kickoff_datetime ? new Date(m.kickoff_datetime).getTime() : Infinity;
+        const kickoffMs = (m) => m.kickoff_at ? new Date(m.kickoff_at).getTime() : Infinity;
 
         const sorted = [...filteredMatches].sort((a, b) => {
           const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -624,8 +621,8 @@ export default function EditionMatches() {
                             <div className="shrink-0 text-center w-24">
                               {m.status === 'scheduled' ? (
                                 <span className="text-slate-300 font-semibold text-sm">
-                                  {m.kickoff_datetime
-                                    ? new Date(m.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                                  {m.kickoff_at
+                                    ? new Date(m.kickoff_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                                     : 'vs'}
                                 </span>
                               ) : (
@@ -676,11 +673,11 @@ export default function EditionMatches() {
                           </div>
                           {/* Sub row */}
                           <div className="flex items-center gap-3 mt-1 pl-1">
-                            {m.kickoff_datetime && (
+                            {m.kickoff_at && (
                               <span className="text-slate-500 text-xs">
-                                {new Date(m.kickoff_datetime).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                {new Date(m.kickoff_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                                 {' · '}
-                                {new Date(m.kickoff_datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(m.kickoff_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                             {m.venue && (

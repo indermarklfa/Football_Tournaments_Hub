@@ -1,35 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  getAdminOrganiserAccounts,
-  createAdminOrganiserAccount,
-  deleteAdminOrganiserAccount,
+  getOrganizations,
   getAdminAllCompetitions,
-  resetOrganiserPassword,
   changePassword,
 } from '../../lib/api';
 
 const AGE_GROUPS = ['U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'U21', 'Senior', 'Veterans'];
 
 export default function SuperAdminDashboard() {
-  const [accounts, setAccounts] = useState([]);
-  const [tournaments, setTournaments] = useState([]);
-  const [tab, setTab] = useState('organisers');
-  const [showForm, setShowForm] = useState(false);
-  const [expandedOrg, setExpandedOrg] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [organizations, setOrganizations] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [tab, setTab] = useState('organizations');
+  const [successMessage, setSuccessMessage] = useState(location.state?.success || '');
   const [ageGroupFilter, setAgeGroupFilter] = useState('');
-  const [form, setForm] = useState({
-    email: '', password: '', organiser_name: '', organiser_location: '', organiser_description: ''
-  });
-  const [movingTournament, setMovingTournament] = useState(null);
-  const [moveTargetOrganiserId, setMoveTargetOrganiserId] = useState('');
+  const [movingCompetition, setMovingCompetition] = useState(null);
+  const [moveTargetOrganizationId, setMoveTargetOrganizationId] = useState('');
   const [moveError, setMoveError] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [resettingPassword, setResettingPassword] = useState(null); // { user_id, email }
-  const [newPassword, setNewPassword] = useState('');
-  const [resetError, setResetError] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [passwordError, setPasswordError] = useState('');
@@ -39,65 +29,27 @@ export default function SuperAdminDashboard() {
 
   const loadData = async () => {
     try {
-      const [accountsRes, tournamentsRes] = await Promise.all([
-        getAdminOrganiserAccounts(),
+      const [orgsRes, competitionsRes] = await Promise.all([
+        getOrganizations(),
         getAdminAllCompetitions(),
       ]);
-      setAccounts(accountsRes.data);
-      setTournaments(tournamentsRes.data);
+      setOrganizations(orgsRes.data);
+      setCompetitions(competitionsRes.data);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      await createAdminOrganiserAccount(form);
-      setForm({ email: '', password: '', organiser_name: '', organiser_location: '', organiser_description: '' });
-      setShowForm(false);
-      await loadData();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create account');
-    }
-  };
-
-  const handleDelete = async (userId, email) => {
-    if (!window.confirm(`Delete account for ${email}? This will remove all their data.`)) return;
-    await deleteAdminOrganiserAccount(userId);
-    await loadData();
-  };
-
   const handleMove = async () => {
-    if (!moveTargetOrganiserId) return;
+    if (!moveTargetOrganizationId) return;
     setMoveError('');
     try {
-      // moveAdminTournament removed — endpoint no longer exists
-      setMovingTournament(null);
-      setMoveTargetOrganiserId('');
+      // moveAdminCompetition removed — endpoint no longer exists
+      setMovingCompetition(null);
+      setMoveTargetOrganizationId('');
       await loadData();
     } catch (err) {
-      setMoveError(err.response?.data?.detail || 'Failed to move tournament');
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (newPassword.length < 6) {
-      setResetError('Password must be at least 6 characters');
-      return;
-    }
-    setResetError('');
-    try {
-      await resetOrganiserPassword(resettingPassword.user_id, newPassword);
-      setResetSuccess('Password reset successfully');
-      setTimeout(() => {
-        setResettingPassword(null);
-        setNewPassword('');
-        setResetSuccess('');
-      }, 2000);
-    } catch (err) {
-      setResetError(err.response?.data?.detail || 'Failed to reset password');
+      setMoveError(err.response?.data?.detail || 'Failed to move competition');
     }
   };
 
@@ -126,7 +78,7 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const filteredTournaments = tournaments.filter(t =>
+  const filteredCompetitions = competitions.filter(t =>
     ageGroupFilter ? t.age_group === ageGroupFilter : true
   );
 
@@ -140,29 +92,30 @@ export default function SuperAdminDashboard() {
         <h1 className="text-3xl font-black text-white">Super Admin</h1>
       </div>
 
+      {successMessage && (
+        <div className="bg-emerald-900/50 text-emerald-300 p-3 rounded mb-6 text-sm flex items-center justify-between">
+          {successMessage}
+          <button onClick={() => setSuccessMessage('')} className="text-emerald-400 hover:text-white ml-4">✕</button>
+        </div>
+      )}
+
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-8">
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
-          <p className="text-emerald-400 font-black text-3xl">{accounts.length}</p>
+          <p className="text-emerald-400 font-black text-3xl">{organizations.length}</p>
           <p className="text-slate-500 text-xs mt-1">Organizations</p>
         </div>
         <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
-          <p className="text-emerald-400 font-black text-3xl">{tournaments.length}</p>
+          <p className="text-emerald-400 font-black text-3xl">{competitions.length}</p>
           <p className="text-slate-500 text-xs mt-1">Competitions</p>
-        </div>
-        <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-4">
-          <p className="text-emerald-400 font-black text-3xl">
-            {new Set(tournaments.map(t => t.age_group).filter(Boolean)).size}
-          </p>
-          <p className="text-slate-500 text-xs mt-1">Age Groups</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-0 mb-6 border-b border-slate-800">
         {[
-          { id: 'organisers', label: `Organizations (${accounts.length})` },
-          { id: 'tournaments', label: `All Competitions (${tournaments.length})` },
+          { id: 'organizations', label: `Organizations (${organizations.length})` },
+          { id: 'competitions', label: `All Competitions (${competitions.length})` },
         ].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`py-2.5 px-5 text-sm font-medium transition-colors border-b-2 ${
@@ -173,208 +126,84 @@ export default function SuperAdminDashboard() {
         ))}
       </div>
 
-      {/* ORGANISERS TAB */}
-      {tab === 'organisers' && (
+      {/* ORGANIZATIONS TAB */}
+      {tab === 'organizations' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setShowForm(!showForm)}
+            <button onClick={() => navigate('/admin/organizations/new-account')}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm">
-              {showForm ? 'Cancel' : '+ New Organization Account'}
+              + New Organization Account
             </button>
           </div>
 
-          {/* Create form */}
-          {showForm && (
-            <div className="bg-slate-800 rounded-lg p-6">
-              <h2 className="text-white font-semibold mb-4">Create Organiser Account</h2>
-              {error && <div className="bg-red-900/50 text-red-300 p-3 rounded mb-4 text-sm">{error}</div>}
-              <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Email *</label>
-                  <input type="email" required value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Password *</label>
-                  <input type="password" required value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Organiser Name *</label>
-                  <input required value={form.organiser_name}
-                    onChange={(e) => setForm({ ...form, organiser_name: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 text-sm mb-1">Location</label>
-                  <input value={form.organiser_location}
-                    onChange={(e) => setForm({ ...form, organiser_location: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-slate-300 text-sm mb-1">Description</label>
-                  <input value={form.organiser_description}
-                    onChange={(e) => setForm({ ...form, organiser_description: e.target.value })}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm" />
-                </div>
-                <div className="col-span-2 flex gap-3">
-                  <button type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded text-sm">
-                    Create Account
-                  </button>
-                  <button type="button" onClick={() => setShowForm(false)}
-                    className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Reset password modal */}
-          {resettingPassword && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-              <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
-                <h2 className="text-white font-semibold mb-1">Reset Password</h2>
-                <p className="text-slate-400 text-sm mb-4">
-                  For: <span className="text-white">{resettingPassword.email}</span>
-                </p>
-                {resetError && <div className="bg-red-900/50 text-red-300 text-sm p-2 rounded mb-3">{resetError}</div>}
-                {resetSuccess && <div className="bg-emerald-900/50 text-emerald-300 text-sm p-2 rounded mb-3">{resetSuccess}</div>}
-                <label className="block text-slate-300 text-sm mb-1">New Password</label>
-                <input type="password" value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Min 6 characters"
-                  className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm mb-4" />
-                <div className="flex gap-3">
-                  <button onClick={handleResetPassword} disabled={!newPassword}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
-                    Reset Password
-                  </button>
-                  <button onClick={() => { setResettingPassword(null); setNewPassword(''); setResetError(''); setResetSuccess(''); }}
-                    className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Accounts list */}
-          {accounts.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No organization accounts yet</p>
+          {organizations.length === 0 ? (
+            <p className="text-slate-500 text-center py-8">No organizations yet</p>
           ) : (
             <div className="space-y-2">
-              {accounts.map((a) => {
-                const orgTournaments = tournaments.filter(t => t.organiser_name === a.organiser_name);
-                const isExpanded = expandedOrg === a.user_id && a.user_id;
-                return (
-                  <div key={a.user_id} className="bg-slate-800 rounded-lg overflow-hidden">
-                    {/* Organiser row */}
-                    <div
-                      className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition-colors"
-                      onClick={() => setExpandedOrg(isExpanded ? null : a.user_id)}>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
-                        <div>
-                          <p className="text-white font-medium">{a.organiser_name}</p>
-                          <p className="text-slate-400 text-sm">{a.email}</p>
-                          {a.organiser_location && (
-                            <p className="text-slate-500 text-xs">{a.organiser_location}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-slate-500 text-xs">{orgTournaments.length} tournament{orgTournaments.length !== 1 ? 's' : ''}</span>
-                        <span className="text-slate-500 text-xs">{new Date(a.created_at).toLocaleDateString()}</span>
-                        <button onClick={() => { setResettingPassword(a); setNewPassword(''); setResetError(''); setResetSuccess(''); }}
-                          className="text-slate-400 hover:text-white text-sm">
-                          Reset PW
-                        </button>
-                        <button onClick={() => handleDelete(a.user_id, a.email)}
-                          className="text-red-400 hover:text-red-300 text-sm">
-                          Delete
-                        </button>
-                      </div>
+              {organizations.map((org) => (
+                <div key={org.id} className="bg-slate-800 rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-medium">{org.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {org.short_name && (
+                        <span className="text-slate-500 text-xs">{org.short_name}</span>
+                      )}
+                      {org.organization_type && (
+                        <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded capitalize">
+                          {org.organization_type}
+                        </span>
+                      )}
+                      {org.status && org.status !== 'active' && (
+                        <span className="text-xs bg-amber-900/50 text-amber-400 px-2 py-0.5 rounded capitalize">
+                          {org.status}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Expanded tournaments */}
-                    {isExpanded && (
-                      <div className="border-t border-slate-700 bg-slate-800 px-4 py-3">
-                        {orgTournaments.length === 0 ? (
-                          <p className="text-slate-500 text-sm py-2">No tournaments yet</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {orgTournaments.map(t => (
-                              <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-slate-700/40 last:border-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-white text-sm">{t.name}</span>
-                                  {t.age_group && (
-                                    <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded">
-                                      {t.age_group}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => { setMovingTournament(t); setMoveTargetOrganiserId(''); setTab('tournaments'); }}
-                                    className="text-slate-400 hover:text-white text-xs">
-                                    Move
-                                  </button>
-                                  <Link to={`/admin/competitions/${t.id}`}
-                                    className="text-emerald-400 hover:text-emerald-300 text-xs">
-                                    View →
-                                  </Link>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                  <Link to={`/admin/organizations/${org.id}`}
+                    className="text-emerald-400 hover:text-emerald-300 text-sm">
+                    View →
+                  </Link>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* ALL TOURNAMENTS TAB */}
-      {tab === 'tournaments' && (
+      {/* ALL COMPETITIONS TAB */}
+      {tab === 'competitions' && (
         <div className="space-y-4">
           {/* Move modal */}
-          {movingTournament && (
+          {movingCompetition && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
               <div className="bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
-                <h2 className="text-white font-semibold mb-1">Move Tournament</h2>
+                <h2 className="text-white font-semibold mb-1">Move Competition</h2>
                 <p className="text-slate-400 text-sm mb-4">
-                  Moving: <span className="text-white">{movingTournament.name}</span>
+                  Moving: <span className="text-white">{movingCompetition.name}</span>
                 </p>
                 {moveError && (
                   <div className="bg-red-900/50 text-red-300 text-sm p-2 rounded mb-3">{moveError}</div>
                 )}
-                <label className="block text-slate-300 text-sm mb-1">Select new organiser</label>
-                <select value={moveTargetOrganiserId}
-                  onChange={(e) => setMoveTargetOrganiserId(e.target.value)}
+                <label className="block text-slate-300 text-sm mb-1">Select new organization</label>
+                <select value={moveTargetOrganizationId}
+                  onChange={(e) => setMoveTargetOrganizationId(e.target.value)}
                   className="w-full bg-slate-700 text-white px-3 py-2 rounded text-sm mb-4">
-                  <option value="">— Select organiser —</option>
-                  {accounts
-                    .filter(a => a.organiser_name !== movingTournament.organiser_name)
-                    .map(a => (
-                      <option key={a.organiser_id} value={a.organiser_id}>
-                        {a.organiser_name} ({a.email})
+                  <option value="">— Select organization —</option>
+                  {organizations
+                    .filter(org => org.name !== movingCompetition.organization_name)
+                    .map(org => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
                       </option>
                     ))}
                 </select>
                 <div className="flex gap-3">
-                  <button onClick={handleMove} disabled={!moveTargetOrganiserId}
+                  <button onClick={handleMove} disabled={!moveTargetOrganizationId}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
                     Confirm Move
                   </button>
-                  <button onClick={() => { setMovingTournament(null); setMoveTargetOrganiserId(''); setMoveError(''); }}
+                  <button onClick={() => { setMovingCompetition(null); setMoveTargetOrganizationId(''); setMoveError(''); }}
                     className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm">
                     Cancel
                   </button>
@@ -399,18 +228,18 @@ export default function SuperAdminDashboard() {
                 Clear
               </button>
             )}
-            <span className="text-slate-500 text-sm ml-auto">{filteredTournaments.length} tournament{filteredTournaments.length !== 1 ? 's' : ''}</span>
+            <span className="text-slate-500 text-sm ml-auto">{filteredCompetitions.length} competition{filteredCompetitions.length !== 1 ? 's' : ''}</span>
           </div>
 
-          {/* Tournament list */}
-          {filteredTournaments.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No tournaments found</p>
+          {/* Competition list */}
+          {filteredCompetitions.length === 0 ? (
+            <p className="text-slate-500 text-center py-8">No competitions found</p>
           ) : (
-            filteredTournaments.map((t) => (
+            filteredCompetitions.map((t) => (
               <div key={t.id} className="bg-slate-800 rounded-lg p-4 flex items-center justify-between">
                 <div>
                   <p className="text-white font-medium">{t.name}</p>
-                  <p className="text-slate-400 text-sm">{t.organiser_name}</p>
+                  <p className="text-slate-400 text-sm">{t.organization_name}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   {t.age_group && (
@@ -419,7 +248,7 @@ export default function SuperAdminDashboard() {
                     </span>
                   )}
                   <button
-                    onClick={() => { setMovingTournament(t); setMoveTargetOrganiserId(''); }}
+                    onClick={() => { setMovingCompetition(t); setMoveTargetOrganizationId(''); }}
                     className="text-slate-400 hover:text-white text-sm">
                     Move
                   </button>
@@ -433,6 +262,7 @@ export default function SuperAdminDashboard() {
           )}
         </div>
       )}
+
       {/* Change Password */}
       <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mt-6">
         <div className="flex items-center justify-between mb-2">

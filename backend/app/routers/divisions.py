@@ -1,23 +1,20 @@
 """Divisions router"""
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import (
-    User, Division, Season, Competition, Organization,
-    AgeGroup, EditionFormat,
-)
-from app.schemas.division import DivisionCreate, DivisionUpdate, DivisionResponse
+from app.models import User, UserRole, Division, Season, Competition, Organization, FormatType
 
 router = APIRouter(prefix="/divisions", tags=["divisions"])
 
 
 async def verify_season_ownership(db: AsyncSession, season_id: UUID, user: User):
-    if user.role == "admin":
+    if user.role == UserRole.ADMIN:
         return
     result = await db.execute(
         select(Season)
@@ -26,7 +23,8 @@ async def verify_season_ownership(db: AsyncSession, season_id: UUID, user: User)
         .where(
             Season.id == season_id,
             Season.deleted_at.is_(None),
-            Organization.created_by_user_id == user.id,
+            Organization.owner_user_id == user.id,
+            Organization.deleted_at.is_(None),
         )
     )
     if not result.scalar_one_or_none():
@@ -34,12 +32,9 @@ async def verify_season_ownership(db: AsyncSession, season_id: UUID, user: User)
 
 
 async def get_division_with_ownership(db: AsyncSession, division_id: UUID, user: User) -> Division:
-    if user.role == "admin":
+    if user.role == UserRole.ADMIN:
         result = await db.execute(
-            select(Division).where(
-                Division.id == division_id,
-                Division.deleted_at.is_(None),
-            )
+            select(Division).where(Division.id == division_id, Division.deleted_at.is_(None))
         )
     else:
         result = await db.execute(
@@ -50,14 +45,52 @@ async def get_division_with_ownership(db: AsyncSession, division_id: UUID, user:
             .where(
                 Division.id == division_id,
                 Division.deleted_at.is_(None),
-                Season.deleted_at.is_(None),
-                Organization.created_by_user_id == user.id,
+                Organization.owner_user_id == user.id,
+                Organization.deleted_at.is_(None),
             )
         )
     division = result.scalar_one_or_none()
     if not division:
         raise HTTPException(status_code=404, detail="Division not found")
     return division
+
+
+class DivisionCreate(BaseModel):
+    season_id: UUID
+    name: str
+    age_group: Optional[str] = None
+    gender: Optional[str] = None
+    format_type: Optional[str] = "league"
+    min_birthdate: Optional[date] = None
+    max_birthdate: Optional[date] = None
+    status: Optional[str] = "active"
+
+
+class DivisionUpdate(BaseModel):
+    name: Optional[str] = None
+    age_group: Optional[str] = None
+    gender: Optional[str] = None
+    format_type: Optional[str] = None
+    min_birthdate: Optional[date] = None
+    max_birthdate: Optional[date] = None
+    status: Optional[str] = None
+
+
+class DivisionResponse(BaseModel):
+    id: UUID
+    season_id: UUID
+    name: str
+    age_group: Optional[str]
+    gender: Optional[str]
+    format_type: str
+    min_birthdate: Optional[date]
+    max_birthdate: Optional[date]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 @router.post("", response_model=DivisionResponse, status_code=status.HTTP_201_CREATED)
@@ -67,12 +100,15 @@ async def create_division(
     user: User = Depends(get_current_user),
 ):
     await verify_season_ownership(db, req.season_id, user)
-
     division = Division(
         season_id=req.season_id,
         name=req.name,
-        format=EditionFormat(req.format) if req.format else EditionFormat.LEAGUE,
-        age_group=AgeGroup(req.age_group) if req.age_group else AgeGroup.OPEN,
+        age_group=req.age_group,
+        gender=req.gender,
+        format_type=FormatType(req.format_type) if req.format_type else FormatType.LEAGUE,
+        min_birthdate=req.min_birthdate,
+        max_birthdate=req.max_birthdate,
+        status=req.status or "active",
     )
     db.add(division)
     await db.commit()
@@ -87,13 +123,9 @@ async def list_divisions(
     user: User = Depends(get_current_user),
 ):
     await verify_season_ownership(db, season_id, user)
-
     result = await db.execute(
         select(Division)
-        .where(
-            Division.season_id == season_id,
-            Division.deleted_at.is_(None),
-        )
+        .where(Division.season_id == season_id, Division.deleted_at.is_(None))
         .order_by(Division.name)
     )
     return result.scalars().all()
@@ -117,18 +149,23 @@ async def update_division(
 ):
     division = await get_division_with_ownership(db, id, user)
     data = req.model_dump(exclude_unset=True)
-
-    if data.pop("deleted", None):
-        division.deleted_at = datetime.now(timezone.utc)
-    else:
-        if "format" in data and data["format"]:
-            data["format"] = EditionFormat(data["format"])
-        if "age_group" in data and data["age_group"]:
-            data["age_group"] = AgeGroup(data["age_group"])
-        for k, v in data.items():
-            setattr(division, k, v)
-
+    if "format_type" in data and data["format_type"]:
+        data["format_type"] = FormatType(data["format_type"])
+    for k, v in data.items():
+        setattr(division, k, v)
     division.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(division)
     return division
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_division(
+    id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    division = await get_division_with_ownership(db, id, user)
+    division.deleted_at = datetime.now(timezone.utc)
+    division.updated_at = datetime.now(timezone.utc)
+    await db.commit()

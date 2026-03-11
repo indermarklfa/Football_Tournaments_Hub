@@ -134,14 +134,16 @@ export default function MatchEvents() {
   const currentShootoutPlayers = shootoutTurn === 'home' ? homePlayers : awayPlayers;
   const currentShootoutTeam = shootoutTurn === 'home' ? match?.home_team_name : match?.away_team_name;
 
-  const getPlayerName = (playerId) =>
-    [...homePlayers, ...awayPlayers].find(p => p.id === playerId)?.name || 'Unknown';
+  const getPlayerName = (playerId) => {
+    const p = [...homePlayers, ...awayPlayers].find(p => p.id === playerId);
+    return p ? `${p.first_name} ${p.last_name}` : 'Unknown';
+  };
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4" data-testid="match-events-page">
 
       {/* Header */}
-      <Link to={`/admin/editions/${match?.edition_id}/matches`}
+      <Link to={`/admin/seasons/${match?.season_id}/matches`}
         className="text-emerald-400 text-sm hover:underline">← Back to Matches</Link>
 
       <div className="flex items-center justify-between mt-3 mb-4">
@@ -232,7 +234,7 @@ export default function MatchEvents() {
                   <option value="">No player</option>
                   {currentPlayers.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.jersey_number ? `#${p.jersey_number} ` : ''}{p.name}
+                      {p.jersey_number ? `#${p.jersey_number} ` : ''}{p.first_name} {p.last_name}
                     </option>
                   ))}
                 </select>
@@ -275,7 +277,7 @@ export default function MatchEvents() {
                   className="flex-1 bg-slate-600 text-white px-3 py-2 rounded text-sm">
                   <option value="">Select player</option>
                   {currentShootoutPlayers.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
                   ))}
                 </select>
                 <button onClick={() => handleAddShootoutKick(true)}

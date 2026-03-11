@@ -39,9 +39,9 @@ export default function NewEdition() {
         start_date: startDate || null,
         end_date: endDate || null,
       });
-      navigate(`/admin/seasons/${res.data.id}/teams`);
+      navigate(`/admin/seasons/${res.data.id}/divisions`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create edition');
+      setError(err.response?.data?.detail || 'Failed to create season');
     } finally {
       setLoading(false);
     }

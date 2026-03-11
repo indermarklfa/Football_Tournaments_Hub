@@ -21,7 +21,12 @@ export default function Login() {
       const { getMe } = await import('../../lib/api');
       const meRes = await getMe();
       login(res.data.access_token, meRes.data);
-      navigate('/admin/dashboard');
+      const role = meRes.data.role;
+      if (role === 'admin') {
+        navigate('/admin/super');
+      } else {
+        navigate('/admin/organiser');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed');
     } finally {

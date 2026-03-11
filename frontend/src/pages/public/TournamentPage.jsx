@@ -11,27 +11,27 @@ const STATUS_CONFIG = {
   completed: { label: 'Completed', dot: 'bg-slate-500',                 badge: 'bg-slate-700/50 text-slate-400 border-slate-600/30' },
 };
 
-export default function TournamentPage() {
+export default function CompetitionPage() {
   const { id } = useParams();
-  const [tournament, setTournament] = useState(null);
+  const [competition, setCompetition] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getPublicCompetition(id)
-      .then((res) => setTournament(res.data))
+      .then((res) => setCompetition(res.data))
       .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
-  if (!tournament) return <div className="text-center py-12 text-red-400">Tournament not found</div>;
+  if (!competition) return <div className="text-center py-12 text-red-400">Competition not found</div>;
 
-  const editions = tournament.editions || [];
-  const activeEditions = editions.filter(e => e.status === 'active');
-  const upcomingEditions = editions.filter(e => e.status === 'upcoming');
-  const completedEditions = editions.filter(e => e.status === 'completed').sort((a, b) => b.year - a.year);
+  const seasons = competition.seasons || [];
+  const activeSeasons = seasons.filter(e => e.status === 'active');
+  const upcomingSeasons = seasons.filter(e => e.status === 'upcoming');
+  const completedSeasons = seasons.filter(e => e.status === 'completed').sort((a, b) => b.year - a.year);
 
-  const logoUrl = tournament.logo_url
-    ? (tournament.logo_url.startsWith('http') ? tournament.logo_url : `http://localhost:8000${tournament.logo_url}`)
+  const logoUrl = competition.logo_url
+    ? (competition.logo_url.startsWith('http') ? competition.logo_url : `http://localhost:8000${competition.logo_url}`)
     : null;
 
   return (
@@ -62,26 +62,26 @@ export default function TournamentPage() {
             {/* Logo */}
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl shrink-0 overflow-hidden border-2 border-slate-700 bg-slate-800 flex items-center justify-center shadow-xl shadow-black/40">
               {logoUrl ? (
-                <img src={logoUrl} alt={tournament.name} className="w-full h-full object-cover" />
+                <img src={logoUrl} alt={competition.name} className="w-full h-full object-cover" />
               ) : (
-                <span className="text-emerald-400 font-black text-4xl">{tournament.name[0]}</span>
+                <span className="text-emerald-400 font-black text-4xl">{competition.name[0]}</span>
               )}
             </div>
 
             {/* Title block */}
             <div className="flex-1 text-center sm:text-left">
               <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight tracking-tight">
-                {tournament.name}
+                {competition.name}
               </h1>
-              {tournament.description && (
-                <p className="text-slate-400 text-sm mt-1 max-w-xl">{tournament.description}</p>
+              {competition.description && (
+                <p className="text-slate-400 text-sm mt-1 max-w-xl">{competition.description}</p>
               )}
               <div className="flex items-center gap-3 mt-2 justify-center sm:justify-start flex-wrap">
                 <span className="text-slate-500 text-xs">
-                  {tournament.organiser_name}
+                  {competition.organiser_name}
                 </span>
-                {tournament.organiser_location && (
-                  <span className="text-slate-600 text-xs">· {tournament.organiser_location}</span>
+                {competition.organiser_location && (
+                  <span className="text-slate-600 text-xs">· {competition.organiser_location}</span>
                 )}
               </div>
             </div>
@@ -90,19 +90,19 @@ export default function TournamentPage() {
           {/* Stats row */}
           <div className="flex items-center gap-6 mt-6 pt-6 border-t border-slate-800">
             <div>
-              <p className="text-emerald-400 font-bold text-xl leading-none">{editions.length}</p>
-              <p className="text-slate-500 text-xs mt-0.5">Edition{editions.length !== 1 ? 's' : ''}</p>
+              <p className="text-emerald-400 font-bold text-xl leading-none">{seasons.length}</p>
+              <p className="text-slate-500 text-xs mt-0.5">Season{seasons.length !== 1 ? 's' : ''}</p>
             </div>
-            {completedEditions.length > 0 && (
+            {completedSeasons.length > 0 && (
               <>
                 <div className="w-px h-8 bg-slate-800" />
                 <div>
-                  <p className="text-emerald-400 font-bold text-xl leading-none">{completedEditions.length}</p>
+                  <p className="text-emerald-400 font-bold text-xl leading-none">{completedSeasons.length}</p>
                   <p className="text-slate-500 text-xs mt-0.5">Completed</p>
                 </div>
               </>
             )}
-            {activeEditions.length > 0 && (
+            {activeSeasons.length > 0 && (
               <>
                 <div className="w-px h-8 bg-slate-800" />
                 <div className="flex items-center gap-1.5">
@@ -115,17 +115,17 @@ export default function TournamentPage() {
         </div>
       </div>
 
-      {/* ── EDITIONS ── */}
+      {/* ── SEASONS ── */}
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
         {/* Active */}
-        {activeEditions.length > 0 && (
+        {activeSeasons.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3">
               ● Live Now
             </p>
             <div className="space-y-2">
-              {activeEditions.map(e => (
+              {activeSeasons.map(e => (
                 <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-700/40 hover:border-emerald-500/50 rounded-xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/10">
                   <div className="w-0.5 self-stretch bg-emerald-500 rounded-full shrink-0" />
@@ -145,13 +145,13 @@ export default function TournamentPage() {
         )}
 
         {/* Upcoming */}
-        {upcomingEditions.length > 0 && (
+        {upcomingSeasons.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">
               Upcoming
             </p>
             <div className="space-y-2">
-              {upcomingEditions.map(e => (
+              {upcomingSeasons.map(e => (
                 <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-amber-950/20 hover:bg-amber-950/30 border border-amber-700/30 hover:border-amber-500/40 rounded-xl p-4 transition-all hover:-translate-y-0.5">
                   <div className="w-0.5 self-stretch bg-amber-500/60 rounded-full shrink-0" />
@@ -174,13 +174,13 @@ export default function TournamentPage() {
         )}
 
         {/* History */}
-        {completedEditions.length > 0 && (
+        {completedSeasons.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Edition History
+              Season History
             </p>
             <div className="space-y-2">
-              {completedEditions.map((e, i) => (
+              {completedSeasons.map((e, i) => (
                 <Link key={e.id} to={`/seasons/${e.id}`}
                   className="group flex items-center gap-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/30 hover:border-slate-600/50 rounded-xl p-4 transition-all hover:-translate-y-0.5"
                   data-testid={`edition-link-${e.id}`}>
@@ -197,7 +197,7 @@ export default function TournamentPage() {
                       {e.start_date && e.end_date && ` · ${formatShort(e.start_date)} – ${formatShort(e.end_date)}`}
                     </p>
                   </div>
-                  {i === 0 && completedEditions.length > 1 && (
+                  {i === 0 && completedSeasons.length > 1 && (
                     <span className="text-xs text-slate-500 shrink-0">Latest</span>
                   )}
                   <span className="text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all text-lg">›</span>
@@ -207,8 +207,8 @@ export default function TournamentPage() {
           </div>
         )}
 
-        {editions.length === 0 && (
-          <div className="text-center py-12 text-slate-500 text-sm">No editions yet</div>
+        {seasons.length === 0 && (
+          <div className="text-center py-12 text-slate-500 text-sm">No seasons yet</div>
         )}
       </div>
     </div>

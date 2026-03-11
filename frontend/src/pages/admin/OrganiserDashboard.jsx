@@ -79,7 +79,7 @@ export default function OrganiserDashboard() {
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading...</div>;
   if (error) return <div className="text-center py-12 text-red-400">{error}</div>;
-  if (!organization) return <div className="text-center py-12 text-slate-400">No organiser profile found.</div>;
+  if (!organization) return <div className="text-center py-12 text-slate-400">No organization profile found.</div>;
 
   const liveTournaments = competitions.filter(t => t.status === 'active');
   const upcomingTournaments = competitions.filter(t => t.status === 'upcoming');
@@ -172,7 +172,7 @@ export default function OrganiserDashboard() {
       <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Your Competitions</h2>
-          <Link to={`/admin/competitions/new?organiser_id=${organization.id}`}
+          <Link to={`/admin/competitions/new?organization_id=${organization.id}`}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
             + New
           </Link>
@@ -220,26 +220,6 @@ export default function OrganiserDashboard() {
           className="text-emerald-400 hover:text-emerald-300 text-sm mt-3 inline-block"
         >
           View all clubs →
-        </Link>
-      </div>
-
-      {/* Officials Card */}
-      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Officials</h2>
-          <Link
-            to={`/admin/organizations/${organization.id}/officials/new?organization_id=${organization.id}`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-          >
-            + Add
-          </Link>
-        </div>
-        <p className="text-slate-500 text-sm mt-1">Manage match officials for your organisation</p>
-        <Link
-          to={`/admin/organizations/${organization.id}/officials`}
-          className="text-emerald-400 hover:text-emerald-300 text-sm mt-3 inline-block"
-        >
-          View all officials →
         </Link>
       </div>
 
