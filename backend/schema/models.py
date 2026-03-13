@@ -56,6 +56,7 @@ class PlayerPosition(str, PyEnum):
 class MatchStatus(str, PyEnum):
     SCHEDULED = "scheduled"
     LIVE = "live"
+    PENALTIES  = "penalties"
     COMPLETED = "completed"
     POSTPONED = "postponed"
     CANCELLED = "cancelled"
@@ -71,6 +72,9 @@ class EventType(str, PyEnum):
     SUB_OFF = "sub_off"
     PENALTY_SCORED = "penalty_scored"
     PENALTY_MISSED = "penalty_missed"
+    ASSIST = "assist"
+    PENALTY_SHOOTOUT_SCORED = "penalty_shootout_scored"
+    PENALTY_SHOOTOUT_MISSED = "penalty_shootout_missed"
 
 
 class UserRole(str, PyEnum):
@@ -322,6 +326,10 @@ class ClubPlayerMembership(Base):
     __tablename__ = "club_player_memberships"
     __table_args__ = (
         UniqueConstraint("player_id", "club_id", "start_date", name="uq_membership_player_club_start"),
+        CheckConstraint(
+            "end_date IS NULL OR end_date >= start_date",
+            name="ck_membership_dates_valid",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -354,6 +362,9 @@ class Team(Base):
     club_id = Column(UUID(as_uuid=True), ForeignKey("clubs.id", ondelete="CASCADE"), nullable=False)
     division_id = Column(UUID(as_uuid=True), ForeignKey("divisions.id", ondelete="CASCADE"), nullable=False)
     display_name = Column(String(255), nullable=False)
+    age_group_snapshot = Column(String(100), nullable=True)
+    gender_snapshot = Column(String(50), nullable=True)
+    division_name_snapshot = Column(String(255), nullable=True)
     status = Column(String(50), nullable=False, default="active")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
@@ -373,6 +384,14 @@ class PlayerRegistration(Base):
     __tablename__ = "player_registrations"
     __table_args__ = (
         UniqueConstraint("player_id", "team_id", name="uq_registration_player_team"),
+        CheckConstraint(
+            "deregistered_on IS NULL OR registered_on IS NULL OR deregistered_on >= registered_on",
+            name="ck_registration_dates_valid",
+        ),
+        CheckConstraint(
+            "squad_number IS NULL OR (squad_number >= 1 AND squad_number <= 99)",
+            name="ck_registration_squad_number_range",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -431,6 +450,12 @@ class Match(Base):
     __tablename__ = "matches"
     __table_args__ = (
         CheckConstraint("home_team_id != away_team_id", name="ck_match_different_teams"),
+        CheckConstraint(
+            "(home_score IS NULL OR home_score >= 0) AND (away_score IS NULL OR away_score >= 0)",
+            name="ck_match_scores_non_negative",
+        ),
+        CheckConstraint("home_penalties IS NULL OR home_penalties >= 0", name="ck_match_home_penalties_non_negative"),
+        CheckConstraint("away_penalties IS NULL OR away_penalties >= 0", name="ck_match_away_penalties_non_negative"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -449,6 +474,9 @@ class Match(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True))
+    home_penalties = Column(Integer)
+    away_penalties = Column(Integer)
+    shootout_first_team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="SET NULL"))
 
     division = relationship("Division", back_populates="matches")
     group = relationship("Group", back_populates="matches")
@@ -463,6 +491,18 @@ class MatchLineup(Base):
     __tablename__ = "match_lineups"
     __table_args__ = (
         UniqueConstraint("match_id", "team_id", "player_id", name="uq_lineup_match_team_player"),
+        CheckConstraint(
+            "shirt_number IS NULL OR (shirt_number >= 1 AND shirt_number <= 99)",
+            name="ck_lineup_shirt_number_range",
+        ),
+        CheckConstraint(
+            "minute_on IS NULL OR (minute_on >= 0 AND minute_on <= 130)",
+            name="ck_lineup_minute_on_range",
+        ),
+        CheckConstraint(
+            "minute_off IS NULL OR (minute_off >= 0 AND minute_off <= 130)",
+            name="ck_lineup_minute_off_range",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -488,6 +528,16 @@ class MatchLineup(Base):
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
+    __table_args__ = (
+        CheckConstraint(
+            "minute IS NULL OR (minute >= 0 AND minute <= 130)",
+            name="ck_event_minute_range",
+        ),
+        CheckConstraint(
+            "extra_minute IS NULL OR (extra_minute >= 0 AND extra_minute <= 30)",
+            name="ck_event_extra_minute_range",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     match_id = Column(UUID(as_uuid=True), ForeignKey("matches.id", ondelete="CASCADE"), nullable=False)

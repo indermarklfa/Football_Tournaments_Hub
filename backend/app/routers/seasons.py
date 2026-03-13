@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
@@ -96,11 +97,15 @@ async def create_season(
         end_date=req.end_date,
         status=req.status or "active",
     )
-    db.add(season)
-    await db.commit()
-    await db.refresh(season)
-    return season
-
+    try:
+        db.add(season)
+        await db.commit()
+        await db.refresh(season)
+        return season
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        raise HTTPException(status_code=409, detail="This action conflicts with existing season data.")
 
 @router.get("", response_model=list[SeasonResponse])
 async def list_seasons(

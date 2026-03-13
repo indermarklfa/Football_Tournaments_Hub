@@ -44,7 +44,7 @@ export default function DivisionTeams() {
     setAddLoading(true);
     setAddError('');
     try {
-      await createTeam({ season_id, club_id: selectedClubId, division_id });
+      await createTeam({ club_id: selectedClubId, division_id });
       setShowAddForm(false);
       setSelectedClubId('');
       await loadData();
@@ -164,7 +164,7 @@ export default function DivisionTeams() {
                   key={t.id}
                   className={`border-b border-slate-700/50 ${index % 2 === 0 ? '' : 'bg-slate-700/20'}`}
                 >
-                  <td className="px-4 py-3 text-white font-medium">{t.name}</td>
+                  <td className="px-4 py-3 text-white font-medium">{t.display_name}</td>
                   <td className="px-4 py-3 text-slate-300">{clubMap[t.club_id] || '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <button

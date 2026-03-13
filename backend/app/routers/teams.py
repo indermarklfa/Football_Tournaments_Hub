@@ -5,10 +5,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User, UserRole, Organization, Competition, Season, Division, Club, Team
+from app.services.validation import populate_team_snapshots
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -96,7 +98,21 @@ async def create_team(
     if not club:
         raise HTTPException(status_code=404, detail="Club not found")
 
-    display_name = req.display_name or club.name
+    division_result = await db.execute(
+        select(Division).where(Division.id == req.division_id, Division.deleted_at.is_(None))
+    )
+    division = division_result.scalar_one_or_none()
+    if not division:
+        raise HTTPException(status_code=404, detail="Division not found")
+
+    if req.display_name:
+        display_name = req.display_name
+    else:
+        age_group = (division.age_group or "").strip().lower()
+        if age_group and age_group != "open":
+            display_name = f"{club.name} {age_group.upper()}"
+        else:
+            display_name = club.name
 
     team = Team(
         club_id=req.club_id,
@@ -104,10 +120,18 @@ async def create_team(
         display_name=display_name,
         status="active",
     )
-    db.add(team)
-    await db.commit()
-    await db.refresh(team)
-    return team
+    await populate_team_snapshots(db, team)
+    try:
+        db.add(team)
+        await db.commit()
+        await db.refresh(team)
+        return team
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        if "uq_team_club_division" in msg:
+            raise HTTPException(status_code=409, detail="This club already has a team in this division.")
+        raise HTTPException(status_code=409, detail="This action conflicts with existing team data.")
 
 
 @router.get("", response_model=list[TeamResponse])

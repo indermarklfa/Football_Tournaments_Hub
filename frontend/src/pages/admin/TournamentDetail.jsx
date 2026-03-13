@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCompetition, getSeasons, updateCompetition, updateSeason } from '../../lib/api';
+import { getCompetition, getSeasons, updateCompetition, updateSeason, deleteSeason } from '../../lib/api';
 import ImageUpload from '../../components/ImageUpload';
 
 export default function TournamentDetail() {
@@ -87,8 +87,8 @@ export default function TournamentDetail() {
   };
 
   const handleDeleteSeason = async (e) => {
-    if (!window.confirm(`Delete "${e.name}"? This will permanently delete all its teams, matches and events.`)) return;
-    await updateSeason(e.id, { deleted: true });
+    if (!window.confirm(`Delete "${e.name}"? This will remove it from active view.`)) return;
+    await deleteSeason(e.id);
     await loadData();
   };
 
@@ -274,14 +274,8 @@ export default function TournamentDetail() {
                     )}
                     <button onClick={() => startEditSeason(e)}
                       className="text-emerald-400 hover:text-emerald-300 text-sm">Edit</button>
-                    <Link to={`/admin/seasons/${e.id}/teams`}
-                      className="text-emerald-400 hover:underline text-sm">Teams</Link>
                     <Link to={`/admin/seasons/${e.id}/divisions`}
                       className="text-emerald-400 hover:underline text-sm">Divisions</Link>
-                    <Link to={`/admin/seasons/${e.id}/matches`}
-                      className="text-emerald-400 hover:underline text-sm">Matches</Link>
-                    <Link to={`/admin/seasons/${e.id}/discipline`}
-                      className="text-emerald-400 hover:underline text-sm">Discipline</Link>
                     <button onClick={() => handleDeleteSeason(e)}
                       className="text-red-400 hover:text-red-300 text-sm">Delete</button>
                   </div>

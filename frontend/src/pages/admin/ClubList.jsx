@@ -60,8 +60,8 @@ export default function ClubList() {
             <thead>
               <tr className="text-slate-400 border-b border-slate-700">
                 <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">City</th>
-                <th className="text-left px-4 py-3">Province</th>
+                <th className="text-left px-4 py-3">Short Name</th>
+                <th className="text-left px-4 py-3">Status</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -72,8 +72,8 @@ export default function ClubList() {
                   className={`border-b border-slate-700/50 ${index % 2 === 0 ? '' : 'bg-slate-700/20'}`}
                 >
                   <td className="px-4 py-3 text-white font-medium">{c.name}</td>
-                  <td className="px-4 py-3 text-slate-300">{c.city || '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{c.province || '—'}</td>
+                  <td className="px-4 py-3 text-slate-300">{c.short_name || '—'}</td>
+                  <td className="px-4 py-3 text-slate-300">{c.status || '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleRemove(c.id)}

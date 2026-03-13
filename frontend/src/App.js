@@ -65,7 +65,7 @@ function App() {
               <Route path="/admin/competitions/new" element={<ProtectedRoute><NewCompetition /></ProtectedRoute>} />
               <Route path="/admin/competitions/:id" element={<ProtectedRoute><CompetitionDetail /></ProtectedRoute>} />
               <Route path="/admin/seasons/new" element={<ProtectedRoute><NewSeason /></ProtectedRoute>} />
-              <Route path="/admin/seasons/:id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
+              <Route path="/admin/divisions/:division_id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
               <Route path="/admin/seasons/:id/groups" element={<ProtectedRoute><SeasonGroups /></ProtectedRoute>} />
               <Route path="/admin/matches/:id/events" element={<ProtectedRoute><MatchEvents /></ProtectedRoute>} />
               <Route path="/admin/seasons/:season_id/divisions" element={<ProtectedRoute><DivisionList /></ProtectedRoute>} />

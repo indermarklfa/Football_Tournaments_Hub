@@ -5,12 +5,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import (
     User, UserRole, Organization, Competition, Season, Division, Team, PlayerRegistration,
 )
+from app.services.validation import ValidationError, validate_registration_creation
 
 router = APIRouter(prefix="/player-registrations", tags=["player-registrations"])
 
@@ -83,6 +85,16 @@ async def create_registration(
     user: User = Depends(get_current_user),
 ):
     await verify_team_ownership(db, req.team_id, user)
+
+    try:
+        await validate_registration_creation(
+            db,
+            player_id=req.player_id,
+            team_id=req.team_id,
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
     reg = PlayerRegistration(
         player_id=req.player_id,
         team_id=req.team_id,
@@ -92,10 +104,17 @@ async def create_registration(
         registered_on=req.registered_on or date.today(),
         status="active",
     )
-    db.add(reg)
-    await db.commit()
-    await db.refresh(reg)
-    return reg
+    try:
+        db.add(reg)
+        await db.commit()
+        await db.refresh(reg)
+        return reg
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        if "uq_registration_player_team" in msg:
+            raise HTTPException(status_code=409, detail="This player is already registered to this team.")
+        raise HTTPException(status_code=409, detail="This action conflicts with existing registration data.")
 
 
 @router.get("", response_model=list[PlayerRegistrationResponse])

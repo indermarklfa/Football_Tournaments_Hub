@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
@@ -95,10 +96,15 @@ async def create_competition(
         host_structure_id=req.host_structure_id,
         status="active",
     )
-    db.add(comp)
-    await db.commit()
-    await db.refresh(comp)
-    return comp
+    try:
+        db.add(comp)
+        await db.commit()
+        await db.refresh(comp)
+        return comp
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        raise HTTPException(status_code=409, detail="This action conflicts with existing match event data.")
 
 
 @router.get("", response_model=list[CompetitionResponse])

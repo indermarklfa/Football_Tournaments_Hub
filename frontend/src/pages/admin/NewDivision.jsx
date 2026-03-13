@@ -23,7 +23,7 @@ export default function NewDivision() {
       await createDivision({
         season_id: seasonId,
         name,
-        format,
+        format_type: format,
         age_group: ageGroup,
       });
       navigate(`/admin/seasons/${seasonId}/divisions`);

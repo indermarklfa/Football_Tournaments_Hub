@@ -20,10 +20,9 @@ export default function NewEdition() {
     if (competitionId) {
       getCompetition(competitionId).then((res) => {
         setCompetition(res.data);
-        setName(`${res.data.name} ${year}`);
       });
     }
-  }, [competitionId, year]);
+  }, [competitionId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,9 +57,14 @@ export default function NewEdition() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-slate-300 mb-1">Season Name *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} required
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`${year}/${Number(year) + 1} Season`}
+              required
               className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              data-testid="name-input" />
+              data-testid="name-input"
+            />
           </div>
           <div>
             <label className="block text-slate-300 mb-1">Year *</label>

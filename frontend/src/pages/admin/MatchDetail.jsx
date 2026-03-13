@@ -37,9 +37,9 @@ export default function MatchDetail() {
       setMatch(m);
       setScoreForm({ home_score: m.home_score ?? 0, away_score: m.away_score ?? 0, status: m.status });
 
-      const teamsRes = await getTeams(m.season_id);
+      const teamsRes = await getTeams(m.division_id);
       const map = {};
-      teamsRes.data.forEach((t) => { map[t.id] = t.name; });
+      teamsRes.data.forEach((t) => { map[t.id] = t.display_name; });
       setTeamMap(map);
     } catch (err) {
       setError('Failed to load match data');
@@ -75,9 +75,12 @@ export default function MatchDetail() {
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
-      <Link to={`/admin/seasons/${match.season_id}/matches`} className="text-emerald-400 text-sm hover:underline">
-        ← Back to Matches
-      </Link>
+      <button
+        onClick={() => window.history.back()}
+        className="text-emerald-400 text-sm hover:underline"
+      >
+        ← Back
+      </button>
 
       {error && <div className="bg-red-900/50 text-red-300 p-3 rounded">{error}</div>}
 

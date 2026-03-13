@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import (
@@ -65,15 +66,20 @@ async def create_group(
 ):
     await verify_division_ownership(db, division_id, user)
     g = Group(division_id=division_id, name=name, sort_order=sort_order)
-    db.add(g)
-    await db.commit()
-    await db.refresh(g)
-    return {
-        "id": str(g.id),
-        "division_id": str(g.division_id),
-        "name": g.name,
-        "sort_order": g.sort_order,
-    }
+    try:
+        db.add(g)
+        await db.commit()
+        await db.refresh(g)
+        return {
+            "id": str(g.id),
+            "division_id": str(g.division_id),
+            "name": g.name,
+            "sort_order": g.sort_order,
+        }
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        raise HTTPException(status_code=409, detail="This action conflicts with existing match event data.")
 
 
 @router.get("")

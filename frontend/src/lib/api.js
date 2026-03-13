@@ -51,6 +51,7 @@ export const createSeason = (data) => api.post('/api/seasons', data);
 export const getSeasons = (competitionId) => api.get(`/api/seasons?competition_id=${competitionId}`);
 export const getSeason = (id) => api.get(`/api/seasons/${id}`);
 export const updateSeason = (id, data) => api.patch(`/api/seasons/${id}`, data);
+export const deleteSeason = (id) => api.delete(`/api/seasons/${id}`);
 
 // Divisions
 export const createDivision = (data) => api.post('/api/divisions', data);

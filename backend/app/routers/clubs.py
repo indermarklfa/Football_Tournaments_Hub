@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
@@ -99,10 +100,15 @@ async def create_club(
         logo_url=req.logo_url,
         status="active",
     )
-    db.add(club)
-    await db.commit()
-    await db.refresh(club)
-    return club
+    try:
+        db.add(club)
+        await db.commit()
+        await db.refresh(club)
+        return club
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        raise HTTPException(status_code=409, detail="This action conflicts with existing match event data.")
 
 
 @router.get("", response_model=list[ClubResponse])

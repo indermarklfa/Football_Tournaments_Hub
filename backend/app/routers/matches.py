@@ -3,8 +3,10 @@ from uuid import UUID
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.services.validation import ValidationError, validate_match_teams
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from itertools import combinations
 from app.db import get_db
@@ -86,6 +88,9 @@ class MatchUpdate(BaseModel):
     home_score: Optional[int] = None
     away_score: Optional[int] = None
     notes: Optional[str] = None
+    home_penalties: Optional[int] = None
+    away_penalties: Optional[int] = None
+    shootout_first_team_id: Optional[UUID] = None
 
 
 class MatchResponse(BaseModel):
@@ -104,6 +109,9 @@ class MatchResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
     updated_at: datetime
+    home_penalties: Optional[int]
+    away_penalties: Optional[int]
+    shootout_first_team_id: Optional[UUID]
 
     class Config:
         from_attributes = True
@@ -116,14 +124,32 @@ async def create_match(
     user: User = Depends(get_current_user),
 ):
     await verify_division_ownership(db, req.division_id, user)
+
+    try:
+        await validate_match_teams(
+            db,
+            division_id=req.division_id,
+            home_team_id=req.home_team_id,
+            away_team_id=req.away_team_id,
+            group_id=req.group_id,
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
     data = req.model_dump()
     if data.get("status"):
         data["status"] = MatchStatus(data["status"])
+
     m = Match(**data)
-    db.add(m)
-    await db.commit()
-    await db.refresh(m)
-    return m
+    try:
+        db.add(m)
+        await db.commit()
+        await db.refresh(m)
+        return m
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig)
+        raise HTTPException(status_code=409, detail="This action conflicts with existing match data.")
 
 
 @router.get("", response_model=list[MatchResponse])
@@ -161,6 +187,11 @@ async def update_match(
 ):
     m = await get_match_with_ownership(db, id, user)
     data = req.model_dump(exclude_unset=True)
+    if "shootout_first_team_id" in data and data["shootout_first_team_id"] is not None:
+        chosen_team_id = str(data["shootout_first_team_id"])
+        valid_team_ids = {str(m.home_team_id), str(m.away_team_id)}
+        if chosen_team_id not in valid_team_ids:
+            raise HTTPException(status_code=400, detail="Shootout first team must be one of the teams in this match.")
     if "status" in data and data["status"]:
         data["status"] = MatchStatus(data["status"])
     for k, v in data.items():

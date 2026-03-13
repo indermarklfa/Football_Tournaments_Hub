@@ -8,8 +8,7 @@ export default function NewClub() {
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
-  const [city, setCity] = useState('');
-  const [province, setProvince] = useState('');
+  const [shortName, setShortName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,8 +19,7 @@ export default function NewClub() {
       await createClub({
         organization_id: organizationId,
         name,
-        city: city || null,
-        province: province || null,
+        short_name: shortName || null,
       });
       navigate(`/admin/organizations/${organizationId}/clubs`);
     } catch (err) {
@@ -57,19 +55,10 @@ export default function NewClub() {
         </div>
 
         <div>
-          <label className="block text-slate-300 mb-1">City</label>
+          <label className="block text-slate-300 mb-1">Short Name</label>
           <input
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-slate-300 mb-1">Province</label>
-          <input
-            value={province}
-            onChange={(e) => setProvince(e.target.value)}
+            value={shortName}
+            onChange={(e) => setShortName(e.target.value)}
             className="w-full bg-slate-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
