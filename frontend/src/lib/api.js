@@ -74,10 +74,10 @@ export const deleteTeam = (id) => api.delete(`/api/teams/${id}`);
 
 // Players
 export const createPlayer = (data) => api.post('/api/players', data);
-export const getPlayers = ({ name, club_id } = {}) => {
+export const getPlayers = ({ q, id_number } = {}) => {
   const qs = new URLSearchParams();
-  if (name) qs.append('name', name);
-  if (club_id) qs.append('club_id', club_id);
+  if (q) qs.append('q', q);
+  if (id_number) qs.append('id_number', id_number);
   const query = qs.toString();
   return api.get(`/api/players${query ? `?${query}` : ''}`);
 };
@@ -88,6 +88,7 @@ export const deletePlayer = (id) => api.delete(`/api/players/${id}`);
 // Player Registrations
 export const createPlayerRegistration = (data) => api.post('/api/player-registrations', data);
 export const getPlayerRegistrations = (teamId) => api.get(`/api/player-registrations?team_id=${teamId}`);
+export const updatePlayerRegistration = (id, data) => api.patch(`/api/player-registrations/${id}`, data);
 export const deletePlayerRegistration = (id) => api.delete(`/api/player-registrations/${id}`);
 
 // Groups

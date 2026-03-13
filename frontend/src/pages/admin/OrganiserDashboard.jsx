@@ -223,6 +223,26 @@ export default function OrganiserDashboard() {
         </Link>
       </div>
 
+      <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Players</h2>
+          <Link
+            to="/admin/players"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+          >
+            Open
+          </Link>
+        </div>
+        <p className="text-slate-500 text-sm mt-1">Search and manage the global player directory</p>
+        <Link
+          to="/admin/players"
+          className="text-emerald-400 hover:text-emerald-300 text-sm mt-3 inline-block"
+        >
+          View all players →
+        </Link>
+      </div>
+
+
       {/* Change Password Card */}
       <div className="bg-slate-800 border border-slate-700/50 rounded-xl p-5 mt-6">
         <div className="flex items-center justify-between mb-2">

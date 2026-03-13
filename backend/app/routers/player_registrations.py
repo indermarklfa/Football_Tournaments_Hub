@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import (
-    User, UserRole, Organization, Competition, Season, Division, Team, PlayerRegistration,
+    User, UserRole, Organization, Competition, Season, Division, Team, PlayerRegistration, Player,
 )
 from app.services.validation import ValidationError, validate_registration_creation
 
@@ -45,6 +46,30 @@ async def get_registration_with_ownership(db: AsyncSession, reg_id: UUID, user: 
     await verify_team_ownership(db, reg.team_id, user)
     return reg
 
+async def ensure_unique_squad_number(
+    db: AsyncSession,
+    team_id: UUID,
+    squad_number: Optional[int],
+    exclude_registration_id: Optional[UUID] = None,
+) -> None:
+    if squad_number is None:
+        return
+
+    stmt = select(PlayerRegistration).where(
+        PlayerRegistration.team_id == team_id,
+        PlayerRegistration.status == "active",
+        PlayerRegistration.squad_number == squad_number,
+    )
+
+    if exclude_registration_id is not None:
+        stmt = stmt.where(PlayerRegistration.id != exclude_registration_id)
+
+    existing = (await db.execute(stmt)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Squad number {squad_number} is already in use for this team.",
+        )
 
 class PlayerRegistrationCreate(BaseModel):
     player_id: UUID
@@ -60,6 +85,20 @@ class PlayerRegistrationUpdate(BaseModel):
     status: Optional[str] = None
     deregistered_on: Optional[date] = None
 
+class PlayerMiniResponse(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    date_of_birth: Optional[date]
+    gender: Optional[str]
+    nationality: Optional[str]
+    id_number: Optional[str]
+    primary_position: Optional[str]
+    secondary_position: Optional[str]
+    status: str
+
+    class Config:
+        from_attributes = True
 
 class PlayerRegistrationResponse(BaseModel):
     id: UUID
@@ -73,6 +112,7 @@ class PlayerRegistrationResponse(BaseModel):
     deregistered_on: Optional[date]
     created_at: datetime
     updated_at: datetime
+    player: Optional[PlayerMiniResponse] = None
 
     class Config:
         from_attributes = True
@@ -85,7 +125,43 @@ async def create_registration(
     user: User = Depends(get_current_user),
 ):
     await verify_team_ownership(db, req.team_id, user)
+    await ensure_unique_squad_number(
+        db,
+        team_id=req.team_id,
+        squad_number=req.squad_number,
+    )
+    existing_stmt = select(PlayerRegistration).where(
+        PlayerRegistration.player_id == req.player_id,
+        PlayerRegistration.team_id == req.team_id,
+    )
+    existing_reg = (await db.execute(existing_stmt)).scalar_one_or_none()
 
+    if existing_reg:
+        if existing_reg.status in ["inactive", "cancelled"] or existing_reg.deregistered_on is not None:
+            await ensure_unique_squad_number(
+                db,
+                team_id=req.team_id,
+                squad_number=req.squad_number,
+                exclude_registration_id=existing_reg.id,
+            )
+            
+            existing_reg.status = "active"
+            existing_reg.deregistered_on = None
+            existing_reg.registered_on = req.registered_on or date.today()
+            existing_reg.registration_type = req.registration_type or existing_reg.registration_type or "standard"
+            existing_reg.membership_id = req.membership_id
+            existing_reg.squad_number = req.squad_number
+            existing_reg.updated_at = datetime.now(timezone.utc)
+
+            await db.commit()
+            result = await db.execute(
+                select(PlayerRegistration)
+                .options(selectinload(PlayerRegistration.player))
+                .where(PlayerRegistration.id == existing_reg.id)
+            )
+            return result.scalar_one()
+
+        raise HTTPException(status_code=409, detail="This player is already registered to this team.")
     try:
         await validate_registration_creation(
             db,
@@ -107,8 +183,12 @@ async def create_registration(
     try:
         db.add(reg)
         await db.commit()
-        await db.refresh(reg)
-        return reg
+        result = await db.execute(
+            select(PlayerRegistration)
+            .options(selectinload(PlayerRegistration.player))
+            .where(PlayerRegistration.id == reg.id)
+        )
+        return result.scalar_one()
     except IntegrityError as e:
         await db.rollback()
         msg = str(e.orig)
@@ -126,7 +206,11 @@ async def list_registrations(
     await verify_team_ownership(db, team_id, user)
     result = await db.execute(
         select(PlayerRegistration)
-        .where(PlayerRegistration.team_id == team_id)
+        .options(selectinload(PlayerRegistration.player))
+        .where(
+            PlayerRegistration.team_id == team_id,
+            PlayerRegistration.status == "active",
+        )
         .order_by(PlayerRegistration.squad_number)
     )
     return result.scalars().all()
@@ -141,12 +225,24 @@ async def update_registration(
 ):
     reg = await get_registration_with_ownership(db, id, user)
     data = req.model_dump(exclude_unset=True)
+    new_squad_number = data["squad_number"] if "squad_number" in data else reg.squad_number
+
+    await ensure_unique_squad_number(
+        db,
+        team_id=reg.team_id,
+        squad_number=new_squad_number,
+        exclude_registration_id=reg.id,
+    )
     for k, v in data.items():
         setattr(reg, k, v)
     reg.updated_at = datetime.now(timezone.utc)
     await db.commit()
-    await db.refresh(reg)
-    return reg
+    result = await db.execute(
+        select(PlayerRegistration)
+        .options(selectinload(PlayerRegistration.player))
+        .where(PlayerRegistration.id == reg.id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

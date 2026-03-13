@@ -32,6 +32,7 @@ import NewClub from './pages/admin/NewClub';
 import DivisionTeams from './pages/admin/DivisionTeams';
 import OrganizationDetail from './pages/admin/OrganizationDetail';
 import NewOrganizationAccount from './pages/admin/NewOrganizationAccount';
+import PlayerList from './pages/admin/PlayerList';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
               <Route path="/admin/competitions/new" element={<ProtectedRoute><NewCompetition /></ProtectedRoute>} />
               <Route path="/admin/competitions/:id" element={<ProtectedRoute><CompetitionDetail /></ProtectedRoute>} />
               <Route path="/admin/seasons/new" element={<ProtectedRoute><NewSeason /></ProtectedRoute>} />
+              <Route path="/admin/players" element={<ProtectedRoute><PlayerList /></ProtectedRoute>} />
               <Route path="/admin/divisions/:division_id/matches" element={<ProtectedRoute><EditionMatches /></ProtectedRoute>} />
               <Route path="/admin/seasons/:id/groups" element={<ProtectedRoute><SeasonGroups /></ProtectedRoute>} />
               <Route path="/admin/matches/:id/events" element={<ProtectedRoute><MatchEvents /></ProtectedRoute>} />
